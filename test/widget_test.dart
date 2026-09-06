@@ -1,0 +1,306 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:stockmix/design.dart';
+import 'package:stockmix/forms.dart';
+import 'package:stockmix/main.dart';
+import 'package:stockmix/scanner_page.dart';
+import 'package:stockmix/stock_store.dart';
+
+void main() {
+  testWidgets(
+    'phone navigates inventory, item details, and sales without overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final originalHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        debugPrint(details.toString());
+        originalHandler?.call(details);
+      };
+      final store = StockStore(persist: (_) async {});
+      await store.loadDemo();
+      await tester.pumpWidget(StockmixApp(store: store));
+      await tester.pumpAndSettle();
+      expect(find.text('Today’s sales'.toUpperCase()), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Stock'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Ceramic');
+      await tester.pumpAndSettle();
+      expect(find.text('Ceramic everyday mug'), findsOneWidget);
+      await tester.tap(find.text('Ceramic everyday mug'));
+      await tester.pumpAndSettle();
+      expect(find.text('Selling price'.toUpperCase()), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Record a sale'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Record a sale'));
+      await tester.pumpAndSettle();
+      expect(find.text('New sale'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('wide overview and all main destinations render', (tester) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final originalHandler = FlutterError.onError;
+    FlutterError.onError = (details) {
+      debugPrint(details.toString());
+      originalHandler?.call(details);
+    };
+    final store = StockStore(persist: (_) async {});
+    await store.loadDemo();
+    await tester.pumpWidget(StockmixApp(store: store));
+    await tester.pumpAndSettle();
+    for (final label in ['Inventory', 'Day records', 'More', 'Overview']) {
+      await tester.tap(find.text(label).first);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+  testWidgets('empty store has a useful first-item action', (tester) async {
+    await tester.pumpWidget(
+      StockmixApp(store: StockStore(persist: (_) async {})),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Add your first item'), 250);
+    await tester.ensureVisible(find.text('Add your first item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add your first item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Item name'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'continuous multi-item scan keeps items on screen, updates running total, and supports quantity controls',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final store = StockStore(persist: (_) async {});
+      await store.saveProduct(
+        const Product(
+          id: 'p1',
+          name: 'Oat Milk 1L',
+          category: 'Pantry',
+          barcode: '1111111111111',
+          price: 350,
+          cost: 200,
+          opening: 10,
+          threshold: 2,
+        ),
+      );
+      await store.saveProduct(
+        const Product(
+          id: 'p2',
+          name: 'Espresso Beans',
+          category: 'Pantry',
+          barcode: '2222222222222',
+          price: 1200,
+          cost: 700,
+          opening: 5,
+          threshold: 1,
+        ),
+      );
+
+      Map<String, int>? returnedCart;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: stockTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    returnedCart = await Navigator.push<Map<String, int>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ScannerPage(
+                          store: store,
+                          mode: ScannerMode.multiItem,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open Scanner'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Open continuous scanner
+      await tester.tap(find.text('Open Scanner'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Scan into sale'), findsOneWidget);
+      expect(find.text('Ready to scan'), findsOneWidget);
+      expect(find.text('\$0.00'), findsOneWidget);
+
+      // Scan first item via the code field
+      final inputField = find.widgetWithText(TextField, 'Or type barcode…');
+      await tester.enterText(inputField, '1111111111111');
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      // Verify item appears in the list under the scanner
+      expect(find.text('Oat Milk 1L'), findsOneWidget);
+      expect(find.text('Ready to scan'), findsNothing);
+      expect(find.text('\$3.50'), findsWidgets);
+      expect(find.text('1 unit'), findsOneWidget);
+
+      // Scan second item
+      await tester.enterText(inputField, '2222222222222');
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      // Both items are present under the scanner
+      expect(find.text('Oat Milk 1L'), findsOneWidget);
+      expect(find.text('Espresso Beans'), findsOneWidget);
+      // Total is $3.50 + $12.00 = $15.50
+      expect(find.text('\$15.50'), findsOneWidget);
+      expect(find.text('2 units'), findsWidgets);
+
+      // Increment Oat Milk quantity using the '+' icon
+      final addButtons = find.byIcon(Icons.add_circle_outline);
+      await tester.tap(addButtons.first);
+      await tester.pumpAndSettle();
+
+      // Total is now 2 * $3.50 + $12.00 = $19.00
+      expect(find.text('\$19.00'), findsOneWidget);
+      expect(find.text('3 units'), findsWidgets);
+
+      // Scan an unknown barcode
+      await tester.enterText(inputField, '9999999999999');
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unregistered barcode'), findsOneWidget);
+      expect(find.text('9999999999999'), findsOneWidget);
+
+      // Dismiss unknown barcode alert
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Unregistered barcode'), findsNothing);
+
+      // Tap 'Review' to finish and return cart
+      await tester.tap(find.text('Review'));
+      await tester.pumpAndSettle();
+
+      expect(returnedCart, isNotNull);
+      expect(returnedCart!['p1'], 2);
+      expect(returnedCart!['p2'], 1);
+    },
+  );
+
+  testWidgets('single barcode mode returns code string immediately', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    String? returnedCode;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: stockTheme(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  returnedCode = await Navigator.push<String>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ScannerPage(),
+                    ),
+                  );
+                },
+                child: const Text('Open Single Scanner'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Single Scanner'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Scan an item'), findsOneWidget);
+
+    final codeField = find.widgetWithText(TextField, 'Barcode / item code');
+    await tester.scrollUntilVisible(
+      codeField,
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(codeField);
+    await tester.enterText(codeField, '1111111111111');
+
+    final findButton = find.text('Find item');
+    await tester.ensureVisible(findButton);
+    await tester.tap(findButton);
+    await tester.pumpAndSettle();
+
+    expect(returnedCode, '1111111111111');
+  });
+
+  testWidgets(
+    'product form handles photo text extraction and suggestion chips',
+    (tester) async {
+      final store = StockStore(persist: (_) async {});
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: stockTheme(),
+          home: ProductForm(store: store),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify initial empty name
+      expect(find.text('Add an item'), findsOneWidget);
+      final nameField = find.widgetWithText(TextFormField, 'Item name');
+      expect(nameField, findsOneWidget);
+
+      // Find PhotoInput and simulate onTextExtracted callback
+      final photoInput = tester.widget<PhotoInput>(find.byType(PhotoInput));
+      expect(photoInput.onTextExtracted, isNotNull);
+
+      // Simulate OCR detecting lines: 'Oat Milk Organic', '1 Liter', 'Barista Edition'
+      photoInput.onTextExtracted!([
+        'Oat Milk Organic',
+        '1 Liter',
+        'Barista Edition',
+      ]);
+      await tester.pumpAndSettle();
+
+      // The name field should auto-fill with the first title
+      expect(find.text('Oat Milk Organic'), findsOneWidget);
+      expect(find.text('Detected from photo (tap to use):'), findsOneWidget);
+      expect(find.text('1 Liter'), findsOneWidget);
+      expect(find.text('Barista Edition'), findsOneWidget);
+
+      // Tap on the '1 Liter' suggestion chip to append
+      await tester.tap(find.widgetWithText(ActionChip, '1 Liter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Oat Milk Organic 1 Liter'), findsOneWidget);
+
+      // Tap Dismiss to clear chips
+      await tester.tap(find.text('Dismiss'));
+      await tester.pumpAndSettle();
+      expect(find.text('Detected from photo (tap to use):'), findsNothing);
+    },
+  );
+}

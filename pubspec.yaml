@@ -1,0 +1,29 @@
+name: stockmix
+description: An offline stock book and daily sales companion.
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: ^3.12.2
+dependencies:
+  flutter:
+    sdk: flutter
+  mobile_scanner: ^7.4.0
+  image_picker: ^1.2.3
+  image: ^4.5.4
+  share_plus: ^13.3.0
+  file_picker: ^12.2.0
+  path_provider: ^2.1.5
+  sembast: ^3.8.5
+  sembast_web: ^2.4.2
+  intl: ^0.20.2
+  uuid: ^4.5.3
+  google_mlkit_text_recognition: ^0.17.1
+  qr_flutter: ^4.1.0
+  crypto: ^3.0.7
+  archive: ^4.2.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
