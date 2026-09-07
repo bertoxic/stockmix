@@ -134,6 +134,9 @@ class StockStore extends ChangeNotifier {
   bool setupCompleted = false;
   String? lastBackupAt;
   bool busy = false;
+  bool soundEnabled = true;
+  bool hapticsEnabled = true;
+  String themeMode = 'system';
 
   List<Product> get products => List.unmodifiable(_products);
   List<Movement> get movements => List.unmodifiable(_movements);
@@ -171,6 +174,9 @@ class StockStore extends ChangeNotifier {
     'currency': currency,
     'setupCompleted': setupCompleted,
     'lastBackupAt': lastBackupAt,
+    'soundEnabled': soundEnabled,
+    'hapticsEnabled': hapticsEnabled,
+    'themeMode': themeMode,
   };
 
   void _restore(Map<String, dynamic> data) {
@@ -193,6 +199,9 @@ class StockStore extends ChangeNotifier {
     currency = data['currency'] ?? 'USD';
     setupCompleted = data['setupCompleted'] ?? (_products.isNotEmpty || _movements.isNotEmpty);
     lastBackupAt = data['lastBackupAt'];
+    soundEnabled = data['soundEnabled'] ?? true;
+    hapticsEnabled = data['hapticsEnabled'] ?? true;
+    themeMode = data['themeMode'] ?? 'system';
   }
 
   Future<T> _commit<T>(T Function() change) async {
@@ -230,9 +239,17 @@ class StockStore extends ChangeNotifier {
   List<Movement> onDay(DateTime day) => _movements
       .where((m) => dayKey(DateTime.parse(m.at).toLocal()) == dayKey(day))
       .toList();
-  int revenue(DateTime day) => onDay(
-    day,
-  ).where((m) => m.type == 'Sale').fold(0, (n, m) => n - m.delta * m.price);
+  int revenue(DateTime day) {
+    var total = 0;
+    for (final m in onDay(day)) {
+      if (m.type == 'Sale') {
+        total += -m.delta * m.price;
+      } else if (m.type == 'Return refund') {
+        total -= m.price;
+      }
+    }
+    return total;
+  }
   int get units => _products.fold(0, (n, p) => n + stock(p));
   int get valuation => _products.fold(0, (n, p) => n + stock(p) * p.cost);
   List<Product> get low =>
@@ -246,6 +263,24 @@ class StockStore extends ChangeNotifier {
       currency = currencyCode;
     }
     setupCompleted = true;
+  });
+
+  Future<void> updateSettings({
+    String? storeName,
+    String? currencyCode,
+    bool? sound,
+    bool? haptics,
+    String? theme,
+  }) => _commit(() {
+    if (storeName != null && storeName.trim().isNotEmpty) {
+      shop = storeName.trim();
+    }
+    if (currencyCode != null && currencyCode.trim().isNotEmpty) {
+      currency = currencyCode.trim();
+    }
+    if (sound != null) soundEnabled = sound;
+    if (haptics != null) hapticsEnabled = haptics;
+    if (theme != null) themeMode = theme;
   });
 
   // --- Held Sales ---
@@ -281,7 +316,14 @@ class StockStore extends ChangeNotifier {
     if (saleMovement.type != 'Sale') {
       throw StateError('Returns can only be processed on sales.');
     }
-    final maxReturn = -saleMovement.delta;
+    final returnRef = 'ret-${saleMovement.reference}';
+    final alreadyReturned = _movements
+        .where((m) =>
+            m.reference == returnRef &&
+            m.productId == saleMovement.productId &&
+            m.type == 'Return restock')
+        .fold<int>(0, (sum, m) => sum + m.delta);
+    final maxReturn = (-saleMovement.delta) - alreadyReturned;
     if (returnQty <= 0 || returnQty > maxReturn) {
       throw StateError('Invalid return quantity (max $maxReturn).');
     }
@@ -291,7 +333,6 @@ class StockStore extends ChangeNotifier {
     }
 
     final reason = note.trim().isEmpty ? 'Customer return' : note.trim();
-    final returnRef = 'ret-${saleMovement.reference}';
 
     if (returnToStock) {
       _movement(
@@ -307,9 +348,10 @@ class StockStore extends ChangeNotifier {
       _movement(
         prod,
         'Return refund',
-        returnToStock ? 0 : 0, // delta is 0 for cash adjustment only if not restocked or balance adjustment
+        0,
         '$reason (Refunded ${moneyString(saleMovement.price * returnQty)})',
         reference: returnRef,
+        price: saleMovement.price * returnQty,
       );
     }
   });
@@ -420,6 +462,7 @@ class StockStore extends ChangeNotifier {
     String note, {
     String? reference,
     String? photo,
+    int? price,
   }) {
     _movements.add(
       Movement(
@@ -428,7 +471,7 @@ class StockStore extends ChangeNotifier {
         name: p.name,
         type: type,
         delta: delta,
-        price: p.price,
+        price: price ?? p.price,
         cost: p.cost,
         note: note,
         reference: reference ?? newId(),

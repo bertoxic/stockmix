@@ -1864,7 +1864,12 @@ class MovementTile extends StatelessWidget {
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: (m.type == 'Sale' ? avocado : cement).withValues(
+              color: (m.type == 'Sale'
+                      ? avocado
+                      : m.type.startsWith('Return')
+                          ? rust
+                          : cement)
+                  .withValues(
                 alpha: .18,
               ),
               borderRadius: BorderRadius.circular(13),
@@ -1872,10 +1877,13 @@ class MovementTile extends StatelessWidget {
             child: Icon(
               m.type == 'Sale'
                   ? Icons.shopping_bag_outlined
-                  : m.delta > 0
-                  ? Icons.south_west
-                  : Icons.north_east,
+                  : m.type.startsWith('Return')
+                      ? Icons.replay_outlined
+                      : m.delta > 0
+                          ? Icons.south_west
+                          : Icons.north_east,
               size: 21,
+              color: m.type.startsWith('Return') ? rust : null,
             ),
           ),
           title: Text(
@@ -1898,112 +1906,130 @@ class MovementTile extends StatelessWidget {
               Text(
                 m.type == 'Sale'
                     ? money(store, -m.delta * m.price)
-                    : '${m.delta > 0 ? '+' : ''}${m.delta}',
-                style: const TextStyle(
+                    : m.type == 'Return restock'
+                        ? '+${m.delta}'
+                        : m.type == 'Return refund'
+                            ? '-${money(store, m.price)}'
+                            : '${m.delta > 0 ? '+' : ''}${m.delta}',
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
+                  color: m.type.startsWith('Return') ? rust : null,
                 ),
               ),
               if (m.type == 'Sale')
                 Text(
                   '${-m.delta} sold',
                   style: const TextStyle(fontSize: 10, color: muted),
+                )
+              else if (m.type == 'Return restock')
+                const Text(
+                  'restocked',
+                  style: TextStyle(fontSize: 10, color: muted),
+                )
+              else if (m.type == 'Return refund')
+                const Text(
+                  'refunded',
+                  style: TextStyle(fontSize: 10, color: muted),
                 ),
             ],
           ),
-          onTap: () => showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            showDragHandle: true,
-            builder: (context) => SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 30),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Tag(m.type),
-                    const SizedBox(height: 16),
-                    Text(
-                      m.name,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Quantity change: ${m.delta > 0 ? '+' : ''}${m.delta}',
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Unit price: ${money(store, m.price)}'),
-                    const SizedBox(height: 8),
-                    Text(
-                      DateFormat(
-                        'd MMM yyyy · h:mm a',
-                      ).format(DateTime.parse(m.at).toLocal()),
-                      style: const TextStyle(color: muted),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(m.note, style: const TextStyle(height: 1.5)),
-                    if (m.photo != null) ...[
-                      const SizedBox(height: 18),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: Image.memory(
-                          base64Decode(m.photo!),
-                          height: 220,
-                          fit: BoxFit.contain,
+          onTap: () async {
+            final action = await showModalBottomSheet<String>(
+              context: context,
+              isScrollControlled: true,
+              showDragHandle: true,
+              builder: (sheetCtx) => SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 30),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Tag(m.type),
+                      const SizedBox(height: 16),
+                      Text(
+                        m.name,
+                        style: Theme.of(sheetCtx).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Quantity change: ${m.delta > 0 ? '+' : ''}${m.delta}',
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Unit price: ${money(store, m.price)}'),
+                      const SizedBox(height: 8),
+                      Text(
+                        DateFormat(
+                          'd MMM yyyy · h:mm a',
+                        ).format(DateTime.parse(m.at).toLocal()),
+                        style: const TextStyle(color: muted),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(m.note, style: const TextStyle(height: 1.5)),
+                      if (m.photo != null) ...[
+                        const SizedBox(height: 18),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.memory(
+                            base64Decode(m.photo!),
+                            height: 220,
+                            fit: BoxFit.contain,
+                          ),
                         ),
+                      ],
+                      const SizedBox(height: 18),
+                      SelectableText(
+                        'Reference: ${m.reference}',
+                        style: const TextStyle(fontSize: 10, color: muted),
                       ),
-                    ],
-                    const SizedBox(height: 18),
-                    SelectableText(
-                      'Reference: ${m.reference}',
-                      style: const TextStyle(fontSize: 10, color: muted),
-                    ),
-                    if (m.type == 'Sale') ...[
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ReceiptInvoicePage.fromMovement(
-                                      store: store,
-                                      movement: m,
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                              label: const Text('Share receipt'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: rust,
-                                foregroundColor: paper,
+                      if (m.type == 'Sale') ...[
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () => Navigator.pop(sheetCtx, 'receipt'),
+                                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                                label: const Text('Share receipt'),
                               ),
-                              onPressed: () async {
-                                Navigator.pop(context);
-                                _showReturnDialog(context);
-                              },
-                              icon: const Icon(Icons.replay_outlined, size: 18),
-                              label: const Text('Process return'),
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: rust,
+                                  foregroundColor: paper,
+                                ),
+                                onPressed: () => Navigator.pop(sheetCtx, 'return'),
+                                icon: const Icon(Icons.replay_outlined, size: 18),
+                                label: const Text('Process return'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+
+            if (!context.mounted) return;
+            if (action == 'receipt') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReceiptInvoicePage.fromMovement(
+                    store: store,
+                    movement: m,
+                  ),
+                ),
+              );
+            } else if (action == 'return') {
+              await _showReturnDialog(context);
+            }
+          },
         ),
       ),
     );
@@ -2011,7 +2037,22 @@ class MovementTile extends StatelessWidget {
 
   Future<void> _showReturnDialog(BuildContext context) async {
     final m = movement;
-    final maxReturn = -m.delta;
+    final returnRef = 'ret-${m.reference}';
+    final alreadyReturned = store.movements
+        .where((prev) =>
+            prev.reference == returnRef &&
+            prev.productId == m.productId &&
+            prev.type == 'Return restock')
+        .fold<int>(0, (sum, prev) => sum + prev.delta);
+
+    final maxReturn = (-m.delta) - alreadyReturned;
+    if (maxReturn <= 0) {
+      if (context.mounted) {
+        showMessage(context, 'All units from this sale have already been returned.');
+      }
+      return;
+    }
+
     var returnQty = 1;
     var returnToStock = true;
     var refundMoney = true;
@@ -2027,22 +2068,33 @@ class MovementTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Original purchase: $maxReturn units at ${money(store, m.price)} each.',
+                'Original purchase: ${-m.delta} units at ${money(store, m.price)} each.${alreadyReturned > 0 ? ' ($alreadyReturned already returned)' : ''}',
                 style: const TextStyle(fontSize: 12, color: muted),
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Quantity to return', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  const Expanded(
+                    child: Text(
+                      'Quantity to return',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.remove_circle_outline),
                         onPressed: returnQty > 1 ? () => setDialogState(() => returnQty--) : null,
                       ),
-                      Text('$returnQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('$returnQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      ),
                       IconButton(
+                        visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.add_circle_outline),
                         onPressed: returnQty < maxReturn ? () => setDialogState(() => returnQty++) : null,
                       ),
