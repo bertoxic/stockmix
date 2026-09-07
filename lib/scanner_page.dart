@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'design.dart';
 import 'forms.dart';
 import 'pages.dart';
+import 'scan_feedback.dart';
 import 'stock_store.dart';
 
 enum ScannerMode {
@@ -22,6 +24,7 @@ class ScannerPage extends StatefulWidget {
   final ScannerMode mode;
   final Map<String, int>? initialCart;
   final String? title;
+  final void Function(Map<String, int> cart)? onCartChanged;
 
   const ScannerPage({
     super.key,
@@ -29,6 +32,7 @@ class ScannerPage extends StatefulWidget {
     this.mode = ScannerMode.singleBarcode,
     this.initialCart,
     this.title,
+    this.onCartChanged,
   });
 
   @override
@@ -42,6 +46,7 @@ class _ScannerPageState extends State<ScannerPage> {
   bool returned = false;
   bool scanPulsing = false;
   bool flashOn = false;
+  bool popping = false;
   String? unrecognizedCode;
   String? lastCode;
   DateTime? lastScannedAt;
@@ -82,7 +87,7 @@ class _ScannerPageState extends State<ScannerPage> {
     if (!isMultiItem) {
       if (returned) return;
       returned = true;
-      HapticFeedback.lightImpact();
+      unawaited(ScanFeedback.success());
       Navigator.pop(context, code);
       return;
     }
@@ -103,12 +108,6 @@ class _ScannerPageState extends State<ScannerPage> {
   void _addScannedCode(String code) {
     final store = widget.store!;
     final product = store.lookup(code);
-
-    HapticFeedback.mediumImpact();
-    setState(() => scanPulsing = true);
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (mounted) setState(() => scanPulsing = false);
-    });
 
     if (product == null) {
       HapticFeedback.vibrate();
@@ -131,7 +130,23 @@ class _ScannerPageState extends State<ScannerPage> {
     setState(() {
       cart[product.id] = currentQty + 1;
       unrecognizedCode = null;
+      scanPulsing = true;
     });
+    _notifyCartChanged();
+    unawaited(ScanFeedback.success());
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => scanPulsing = false);
+    });
+  }
+
+  void _notifyCartChanged() {
+    widget.onCartChanged?.call(Map<String, int>.unmodifiable(cart));
+  }
+
+  void _popWithCart() {
+    if (popping) return;
+    popping = true;
+    Navigator.pop(context, Map<String, int>.from(cart));
   }
 
   void _increment(Product p) {
@@ -145,6 +160,7 @@ class _ScannerPageState extends State<ScannerPage> {
       return;
     }
     setState(() => cart[p.id] = currentQty + 1);
+    _notifyCartChanged();
   }
 
   void _decrement(Product p) {
@@ -156,6 +172,7 @@ class _ScannerPageState extends State<ScannerPage> {
         cart[p.id] = currentQty - 1;
       }
     });
+    _notifyCartChanged();
   }
 
   Future<void> _quickAddProduct(String code) async {
@@ -214,6 +231,7 @@ class _ScannerPageState extends State<ScannerPage> {
       if (!mounted) return;
       final recordedTotal = total;
       setState(() => cart.clear());
+      _notifyCartChanged();
 
       await showDialog<void>(
         context: context,
@@ -231,7 +249,7 @@ class _ScannerPageState extends State<ScannerPage> {
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.pop(context, <String, int>{});
+                _popWithCart();
               },
               child: const Text('Done'),
             ),
@@ -397,48 +415,60 @@ class _ScannerPageState extends State<ScannerPage> {
     final screenHeight = MediaQuery.sizeOf(context).height;
     final cameraHeight = (screenHeight * 0.28).clamp(180.0, 250.0);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title ?? 'Scan into sale'),
-        actions: [
-          if (cameraSupported)
-            IconButton(
-              tooltip: flashOn ? 'Turn off flash' : 'Turn on flash',
-              icon: Icon(flashOn ? Icons.flash_off : Icons.flash_on_outlined),
-              onPressed: () async {
-                try {
-                  await controller.toggleTorch();
-                  setState(() => flashOn = !flashOn);
-                } catch (_) {
-                  if (mounted) {
-                    showMessage(context, 'Flash is unavailable on this camera.');
-                  }
-                }
-              },
-            ),
-          IconButton(
-            tooltip: 'Scan from gallery image',
-            icon: const Icon(Icons.photo_library_outlined),
-            onPressed: upload,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _popWithCart();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Back',
+            onPressed: _popWithCart,
           ),
-          if (cart.isNotEmpty)
+          title: Text(widget.title ?? 'Scan into sale'),
+          actions: [
+            if (cameraSupported)
+              IconButton(
+                tooltip: flashOn ? 'Turn off flash' : 'Turn on flash',
+                icon: Icon(flashOn ? Icons.flash_off : Icons.flash_on_outlined),
+                onPressed: () async {
+                  try {
+                    await controller.toggleTorch();
+                    setState(() => flashOn = !flashOn);
+                  } catch (_) {
+                    if (mounted) {
+                      showMessage(context, 'Flash is unavailable on this camera.');
+                    }
+                  }
+                },
+              ),
             IconButton(
-              tooltip: 'Clear scanned items',
-              icon: const Icon(Icons.delete_sweep_outlined),
-              onPressed: () async {
-                if (await confirm(
-                  context,
-                  'Clear scanned items?',
-                  'This will empty all ${cart.length} items from this scan session.',
-                  action: 'Clear',
-                )) {
-                  setState(() => cart.clear());
-                }
-              },
+              tooltip: 'Scan from gallery image',
+              icon: const Icon(Icons.photo_library_outlined),
+              onPressed: upload,
             ),
-          const SizedBox(width: 8),
-        ],
-      ),
+            if (cart.isNotEmpty)
+              IconButton(
+                tooltip: 'Clear scanned items',
+                icon: const Icon(Icons.delete_sweep_outlined),
+                onPressed: () async {
+                  if (await confirm(
+                    context,
+                    'Clear scanned items?',
+                    'This will empty all ${cart.length} items from this scan session.',
+                    action: 'Clear',
+                  )) {
+                    setState(() => cart.clear());
+                    _notifyCartChanged();
+                  }
+                },
+              ),
+            const SizedBox(width: 8),
+          ],
+        ),
       body: SafeArea(
         child: Column(
           children: [
@@ -859,7 +889,7 @@ class _ScannerPageState extends State<ScannerPage> {
                   const SizedBox(width: 8),
                   if (widget.initialCart != null)
                     FilledButton.icon(
-                      onPressed: () => Navigator.pop(context, cart),
+                      onPressed: _popWithCart,
                       icon: const Icon(Icons.check),
                       label: Text(cart.isEmpty ? 'Done' : 'Apply to sale'),
                     )
@@ -872,9 +902,7 @@ class _ScannerPageState extends State<ScannerPage> {
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             minimumSize: const Size(0, 48),
                           ),
-                          onPressed: cart.isEmpty
-                              ? null
-                              : () => Navigator.pop(context, cart),
+                          onPressed: cart.isEmpty ? null : _popWithCart,
                           child: const Text('Review'),
                         ),
                         const SizedBox(width: 8),
@@ -897,6 +925,7 @@ class _ScannerPageState extends State<ScannerPage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

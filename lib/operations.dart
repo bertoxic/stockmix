@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'design.dart';
-import 'forms.dart';
+import 'invoice_page.dart';
 import 'pages.dart';
 import 'scanner_page.dart';
-import 'sharing.dart';
 import 'stock_store.dart';
 
 class SalePage extends StatefulWidget {
@@ -24,9 +24,19 @@ class _SalePageState extends State<SalePage> {
   final cart = <String, int>{};
   final note = TextEditingController();
   String query = '';
-  String? photo;
   bool saving = false;
   StockStore get store => widget.store;
+
+  List<Product> get _filteredProducts {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      return store.products.reversed.take(4).toList();
+    }
+    return store.products
+        .where((p) => '${p.name} ${p.barcode}'.toLowerCase().contains(q))
+        .take(12)
+        .toList();
+  }
   @override
   void initState() {
     super.initState();
@@ -44,6 +54,14 @@ class _SalePageState extends State<SalePage> {
   }
 
   void add(Product p) {
+    if (store.count != null &&
+        (store.count!['baseline'] as Map).containsKey(p.id)) {
+      showMessage(
+        context,
+        '${p.name} is currently in an active stock count and cannot be sold until the count is completed.',
+      );
+      return;
+    }
     if ((cart[p.id] ?? 0) >= store.stock(p)) {
       showMessage(
         context,
@@ -61,6 +79,14 @@ class _SalePageState extends State<SalePage> {
         builder: (_) => ScannerPage(
           store: store,
           initialCart: cart,
+          onCartChanged: (liveCart) {
+            if (mounted) {
+              setState(() {
+                cart.clear();
+                cart.addAll(liveCart);
+              });
+            }
+          },
           mode: ScannerMode.multiItem,
         ),
       ),
@@ -77,6 +103,7 @@ class _SalePageState extends State<SalePage> {
     0,
     (n, entry) => n + store.product(entry.key).price * entry.value,
   );
+
   Future<void> checkout() async {
     final accepted = await confirm(
       context,
@@ -87,14 +114,17 @@ class _SalePageState extends State<SalePage> {
     if (!accepted || !mounted) return;
     setState(() => saving = true);
     try {
-      await store.checkout(Map.of(cart), note.text, photo: photo);
-      if (!mounted) return;
+      final soldCart = Map<String, int>.from(cart);
       final recordedTotal = total;
+      final saleTime = DateTime.now();
+      final receiptRef = await store.checkout(soldCart, note.text);
+      if (!mounted) return;
+
       setState(() {
         cart.clear();
         note.clear();
-        photo = null;
       });
+
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -108,18 +138,25 @@ class _SalePageState extends State<SalePage> {
             '${money(store, recordedTotal)} saved on this device. Your stock is up to date.',
           ),
           actions: [
-            TextButton(
+            OutlinedButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        SharePage(store: store, initialDay: DateTime.now()),
+                    builder: (_) => ReceiptInvoicePage.fromCart(
+                      store: store,
+                      reference: receiptRef,
+                      cart: soldCart,
+                      total: recordedTotal,
+                      date: saleTime,
+                      note: note.text,
+                    ),
                   ),
                 );
               },
-              child: const Text('Share day record'),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('Share receipt'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
@@ -135,17 +172,64 @@ class _SalePageState extends State<SalePage> {
     }
   }
 
+  Future<void> _holdCurrentSale() async {
+    if (cart.isEmpty) return;
+    try {
+      await store.holdSale(cart, note: note.text);
+      if (mounted) {
+        showMessage(context, 'Sale held. You can resume it anytime from Home or Sales.');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    }
+  }
+
+  Future<void> _discardHeldSale(String id) async {
+    try {
+      await store.deleteHeldSale(id);
+      if (mounted) {
+        setState(() {});
+        showMessage(context, 'Held sale discarded.');
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: cart.isEmpty || saving,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: store,
+    builder: (_, _) => PopScope(
+      canPop: cart.isEmpty || saving,
     onPopInvokedWithResult: (didPop, result) async {
-      if (!didPop &&
-          await confirm(
-            context,
-            'Leave this sale?',
-            'The uncompleted sale will be discarded. Stock has not changed.',
-            action: 'Leave sale',
-          )) {
+      if (didPop || cart.isEmpty) return;
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Leave unfinished sale?'),
+          content: const Text(
+            'You have items in this sale. Would you like to hold this sale so you can resume it later, or discard it?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('Stay'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'discard'),
+              child: const Text('Discard', style: TextStyle(color: rust)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'hold'),
+              child: const Text('Hold sale'),
+            ),
+          ],
+        ),
+      );
+      if (choice == 'hold') {
+        await _holdCurrentSale();
+      } else if (choice == 'discard') {
         if (context.mounted) {
           setState(() => cart.clear());
           Navigator.pop(context);
@@ -156,6 +240,12 @@ class _SalePageState extends State<SalePage> {
       appBar: AppBar(
         title: const Text('New sale'),
         actions: [
+          if (cart.isNotEmpty)
+            TextButton.icon(
+              onPressed: _holdCurrentSale,
+              icon: const Icon(Icons.pause_circle_outline, size: 18),
+              label: const Text('Hold'),
+            ),
           IconButton(
             onPressed: scan,
             tooltip: 'Scan item into sale',
@@ -176,7 +266,162 @@ class _SalePageState extends State<SalePage> {
                 'A good find.\nA simple sale.',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
-              const SizedBox(height: 23),
+              if (store.heldSales.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Surface(
+                  color: linen,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.pause_circle_outline, size: 18, color: plum),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${store.heldSales.length} held ${store.heldSales.length == 1 ? 'sale' : 'sales'} waiting',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      for (final held in store.heldSales) ...[
+                        Builder(builder: (ctx) {
+                          final hCart = Map<String, int>.from(held['cart'] as Map);
+                          final itemCount = hCart.values.fold(0, (a, b) => a + b);
+                          final hTotal = hCart.entries.fold(
+                            0,
+                            (sum, e) => sum + (store.product(e.key).price * e.value),
+                          );
+                          final timeStr = DateFormat('h:mm a').format(
+                            DateTime.parse(held['heldAt'] as String).toLocal(),
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '$itemCount items · ${money(store, hTotal)} ($timeStr)',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final resumed = await store.resumeSale(held['id'] as String);
+                                    if (resumed != null && mounted) {
+                                      setState(() {
+                                        cart.addAll(resumed);
+                                      });
+                                    }
+                                  },
+                                  child: const Text('Resume'),
+                                ),
+                                IconButton(
+                                  tooltip: 'Discard held sale',
+                                  icon: const Icon(Icons.close, size: 16, color: muted),
+                                  onPressed: () => _discardHeldSale(held['id'] as String),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Your sale',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  Tag(
+                    cart.isEmpty
+                        ? '0 items'
+                        : '${cart.values.fold(0, (a, b) => a + b)} items · ${money(store, total)}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (cart.isEmpty)
+                const Text(
+                  'Tap an item below or scan a barcode to add to this sale.',
+                  style: TextStyle(color: muted, fontSize: 12),
+                )
+              else
+                ...cart.entries.map((entry) {
+                  final p = store.product(entry.key);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Surface(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          ProductImage(p, size: 46),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${money(store, p.price)} each · ${money(store, p.price * entry.value)}',
+                                  style: const TextStyle(
+                                    color: muted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Remove one ${p.name}',
+                            onPressed: () => setState(() {
+                              if (entry.value == 1) {
+                                cart.remove(entry.key);
+                              } else {
+                                cart[entry.key] = entry.value - 1;
+                              }
+                            }),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 22,
+                            ),
+                          ),
+                          Text(
+                            '${entry.value}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Add one ${p.name}',
+                            onPressed: () => add(p),
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 24),
               TextField(
                 onChanged: (v) => setState(() => query = v),
                 decoration: InputDecoration(
@@ -189,7 +434,7 @@ class _SalePageState extends State<SalePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               if (store.products.isEmpty)
                 const EmptyState(
                   icon: Icons.shopping_bag_outlined,
@@ -197,142 +442,94 @@ class _SalePageState extends State<SalePage> {
                   subtitle:
                       'Your inventory items will appear here, ready to sell.',
                 )
-              else
-                Surface(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 5,
-                  ),
-                  child: Column(
-                    children: [
-                      for (final p
-                          in store.products
-                              .where(
-                                (p) => '${p.name} ${p.barcode}'
-                                    .toLowerCase()
-                                    .contains(query.toLowerCase()),
-                              )
-                              .take(12))
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 4,
-                          ),
-                          leading: ProductImage(p, size: 44),
-                          title: Text(
-                            p.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${money(store, p.price)}  ·  ${store.stock(p)} available',
-                            style: const TextStyle(fontSize: 11, color: muted),
-                          ),
-                          trailing: IconButton.filledTonal(
-                            tooltip: 'Add ${p.name}',
-                            style: IconButton.styleFrom(backgroundColor: linen),
-                            onPressed: store.stock(p) <= 0
-                                ? null
-                                : () => add(p),
-                            icon: const Icon(Icons.add, size: 18),
-                          ),
-                          onTap: store.stock(p) <= 0 ? null : () => add(p),
-                        ),
-                    ],
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    query.trim().isEmpty
+                        ? 'Recent items'
+                        : 'Matching items (${_filteredProducts.length})',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: muted,
+                    ),
                   ),
                 ),
-              const SizedBox(height: 25),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Your sale',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Tag('${cart.values.fold(0, (a, b) => a + b)} items'),
-                ],
-              ),
-              const SizedBox(height: 15),
-              if (cart.isEmpty)
-                const Text(
-                  'Tap an item or scan a barcode to get started.',
-                  style: TextStyle(color: muted, fontSize: 12),
-                )
-              else
-                ...cart.entries.map((entry) {
-                  final p = store.product(entry.key);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Surface(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  p.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                money(store, p.price * entry.value),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text(
-                                '${money(store, p.price)} each',
-                                style: const TextStyle(
-                                  color: muted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                tooltip: 'Remove one ${p.name}',
-                                onPressed: () => setState(() {
-                                  if (entry.value == 1) {
-                                    cart.remove(entry.key);
-                                  } else {
-                                    cart[entry.key] = entry.value - 1;
-                                  }
-                                }),
-                                icon: const Icon(
-                                  Icons.remove_circle_outline,
-                                  size: 23,
-                                ),
-                              ),
-                              Text(
-                                '${entry.value}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Add one ${p.name}',
-                                onPressed: () => add(p),
-                                icon: const Icon(
-                                  Icons.add_circle_outline,
-                                  size: 23,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                if (_filteredProducts.isEmpty)
+                  Surface(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: Text(
+                        'No items match "$query"',
+                        style: const TextStyle(color: muted, fontSize: 13),
                       ),
                     ),
-                  );
-                }),
+                  )
+                else
+                  Surface(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 5,
+                    ),
+                    child: Column(
+                      children: [
+                        for (final p in _filteredProducts)
+                          Builder(
+                            builder: (context) {
+                              final isCountLocked = store.count != null &&
+                                  (store.count!['baseline'] as Map)
+                                      .containsKey(p.id);
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                leading: ProductImage(p, size: 44),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        p.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isCountLocked)
+                                      const Tag('Counting', color: avocado),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  isCountLocked
+                                      ? 'Locked in active count'
+                                      : '${money(store, p.price)}  ·  ${store.stock(p)} available',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isCountLocked ? rust : muted,
+                                  ),
+                                ),
+                                trailing: IconButton.filledTonal(
+                                  tooltip: isCountLocked
+                                      ? 'Locked in active count'
+                                      : 'Add ${p.name}',
+                                  style: IconButton.styleFrom(
+                                      backgroundColor: linen),
+                                  onPressed: store.stock(p) <= 0 || isCountLocked
+                                      ? null
+                                      : () => add(p),
+                                  icon: const Icon(Icons.add, size: 18),
+                                ),
+                                onTap: store.stock(p) <= 0 || isCountLocked
+                                    ? null
+                                    : () => add(p),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
               const SizedBox(height: 24),
               TextField(
                 controller: note,
@@ -342,12 +539,7 @@ class _SalePageState extends State<SalePage> {
                   hintText: 'Customer name, receipt reference…',
                 ),
               ),
-              const SizedBox(height: 15),
-              PhotoInput(
-                value: photo,
-                onChanged: (v) => setState(() => photo = v),
-              ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
               Surface(
                 color: avocado,
                 child: Row(
@@ -388,7 +580,8 @@ class _SalePageState extends State<SalePage> {
         ),
       ),
     ),
-  );
+  ),
+);
 }
 
 class CountPage extends StatefulWidget {
@@ -401,6 +594,15 @@ class CountPage extends StatefulWidget {
 class _CountPageState extends State<CountPage> {
   StockStore get store => widget.store;
   bool review = false;
+  String selectedScope = 'All items';
+
+  List<Product> get _scopedProducts {
+    if (selectedScope == 'All items') return store.products;
+    return store.products
+        .where((p) => p.category.toLowerCase() == selectedScope.toLowerCase())
+        .toList();
+  }
+
   Future<void> run(Future<void> Function() action) async {
     try {
       await action();
@@ -472,6 +674,7 @@ class _CountPageState extends State<CountPage> {
       final count = store.count;
       final baseline = count?['baseline'] as Map? ?? {};
       final values = count?['values'] as Map? ?? {};
+      final scope = (count?['scope'] as String?) ?? 'All items';
       return Scaffold(
         appBar: AppBar(
           title: Text(review ? 'Review stock count' : 'Count your stock'),
@@ -494,11 +697,67 @@ class _CountPageState extends State<CountPage> {
                 ),
                 const SizedBox(height: 18),
                 if (count == null) ...[
-                  const Text(
-                    'Count every item, review any differences, then post a new stock adjustment. Sales and other stock changes pause while you count.',
-                    style: TextStyle(color: muted, height: 1.6),
+                  Surface(
+                    color: linen,
+                    padding: const EdgeInsets.all(16),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.storefront_outlined, color: plum, size: 22),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Counting during business hours',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Only the items included in this count will have their sales and stock adjustments locked. Uncounted items remain fully available to sell at the checkout.',
+                                style: TextStyle(
+                                  color: muted,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 18),
+                  if (store.categories.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedScope,
+                      decoration: const InputDecoration(
+                        labelText: 'Count scope',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'All items',
+                          child: Text('All items (${store.products.length})'),
+                        ),
+                        for (final cat in store.categories)
+                          DropdownMenuItem(
+                            value: cat,
+                            child: Text(
+                              '$cat (${store.products.where((p) => p.category.toLowerCase() == cat.toLowerCase()).length})',
+                            ),
+                          ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedScope = val);
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   Surface(
                     child: Column(
                       children: [
@@ -509,26 +768,34 @@ class _CountPageState extends State<CountPage> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          '${store.products.length} items to count',
+                          '${_scopedProducts.length} items to count',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Progress saves automatically on this device.',
-                          style: TextStyle(color: muted, fontSize: 12),
+                        Text(
+                          selectedScope == 'All items'
+                              ? 'Full store inventory count. Progress saves automatically.'
+                              : 'Category count: $selectedScope. Progress saves automatically.',
+                          style: const TextStyle(color: muted, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 25),
                   FilledButton(
-                    onPressed: store.products.isEmpty || store.busy
+                    onPressed: _scopedProducts.isEmpty || store.busy
                         ? null
                         : () {
                             setState(() => review = false);
-                            run(store.startCount);
+                            run(() => store.startCount(
+                              category: selectedScope == 'All items' ? null : selectedScope,
+                            ));
                           },
-                    child: const Text('Start full stock count'),
+                    child: Text(
+                      selectedScope == 'All items'
+                          ? 'Start full stock count'
+                          : 'Start count for $selectedScope',
+                    ),
                   ),
                 ] else ...[
                   Surface(
@@ -536,12 +803,18 @@ class _CountPageState extends State<CountPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${values.length} of ${baseline.length} counted',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 19,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${values.length} of ${baseline.length} counted',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 19,
+                              ),
+                            ),
+                            Tag(scope, color: paper),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         LinearProgressIndicator(
@@ -554,9 +827,11 @@ class _CountPageState extends State<CountPage> {
                           minHeight: 6,
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Saved on this device · Stock changes paused',
-                          style: TextStyle(fontSize: 11),
+                        Text(
+                          scope == 'All items'
+                              ? 'Saved on this device · All stock changes paused'
+                              : 'Saved on this device · Counted items locked · Other items sellable',
+                          style: const TextStyle(fontSize: 11),
                         ),
                       ],
                     ),

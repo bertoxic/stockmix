@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../design.dart';
+import '../scan_feedback.dart';
 import '../stock_store.dart';
 import 'qr_stream_coder.dart';
 import 'stream_import_review_page.dart';
@@ -89,7 +91,6 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
 
   Future<void> _handleCompletion() async {
     finished = true;
-    HapticFeedback.mediumImpact();
 
     // Verify SHA-256 integrity and decompress
     final result = decoder.verifyAndDecompress();
@@ -104,6 +105,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
 
     if (!mounted) return;
 
+    unawaited(ScanFeedback.success());
     // Show quick celebratory feedback, then push duplicate-safe review
     await Navigator.pushReplacement<bool, void>(
       context,
@@ -250,7 +252,8 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
+                      Expanded(
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Eyebrow('Reconstruction Progress'),
@@ -262,6 +265,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                           ),
                         ],
+                        ),
                       ),
                       if (stats.totalBlocks > 0)
                         Container(

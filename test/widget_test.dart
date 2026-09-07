@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stockmix/design.dart';
 import 'package:stockmix/forms.dart';
 import 'package:stockmix/main.dart';
+import 'package:stockmix/operations.dart';
 import 'package:stockmix/scanner_page.dart';
 import 'package:stockmix/stock_store.dart';
 
@@ -303,4 +304,106 @@ void main() {
       expect(find.text('Detected from photo (tap to use):'), findsNothing);
     },
   );
+
+  testWidgets(
+    'scanning item from New sale and popping keeps item in Your sale',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final store = StockStore(persist: (_) async {});
+      await store.loadDemo();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: stockTheme(),
+          home: SalePage(store: store),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your sale'), findsOneWidget);
+      expect(find.text('0 items'), findsOneWidget);
+
+      // Open scanner via the scan button in the app bar
+      await tester.tap(find.byTooltip('Scan item into sale'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Scan into sale'), findsOneWidget);
+
+      final p = store.products.first;
+
+      // Scan an item using the manual input
+      final inputField = find.widgetWithText(TextField, 'Or type barcode…');
+      await tester.enterText(inputField, p.barcode);
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      // Verify item appears in the live scanned list
+      expect(find.text(p.name), findsOneWidget);
+
+      // Click the Back button in the AppBar (or swipe back)
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      // Verify we are back on the New sale page
+      expect(find.text('New sale'), findsOneWidget);
+
+      // Crucial: The scanned item must still be present in "Your sale" list!
+      expect(find.text(p.name), findsOneWidget);
+      expect(find.text('0 items'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'share receipt navigates to invoice page with matching UI and details',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final store = StockStore(persist: (_) async {});
+      await store.loadDemo();
+      final p = store.products.first;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: stockTheme(),
+          home: SalePage(store: store, initialProduct: p),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap Checkout
+      await tester.scrollUntilVisible(
+        find.text('Record cash sale'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Record cash sale'));
+      await tester.pumpAndSettle();
+
+      // Confirm dialog appears
+      expect(find.text('Record cash received?'), findsOneWidget);
+      await tester.tap(find.text('Cash received'));
+      await tester.pumpAndSettle();
+
+      // "Sale recorded" dialog appears with "Share receipt"
+      expect(find.text('Sale recorded.'), findsOneWidget);
+      expect(find.text('Share receipt'), findsOneWidget);
+
+      // Tap "Share receipt" - should navigate to Invoice & Receipt page!
+      await tester.tap(find.text('Share receipt'));
+      await tester.pumpAndSettle();
+
+      // Verify we are on the Invoice & Receipt page
+      expect(find.text('Invoice & Receipt'), findsOneWidget);
+      expect(find.text('Sales Receipt & Proof of Purchase'), findsOneWidget);
+      expect(find.text(p.name), findsOneWidget);
+      expect(find.text('PAID · CASH'), findsOneWidget);
+      expect(find.text('Copy text'), findsOneWidget);
+    },
+  );
 }
+

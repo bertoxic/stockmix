@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'backup_page.dart';
 import 'design.dart';
 import 'stock_store.dart';
 import 'qr_stream/qr_stream_sender_page.dart';
@@ -362,6 +363,23 @@ class _SharePageState extends State<SharePage> {
               label: const Text('Import a Stockmix file'),
             ),
             const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: working
+                  ? null
+                  : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BackupRestorePage(store: widget.store),
+                        ),
+                      ),
+              icon: const Icon(Icons.backup_outlined),
+              label: Text(
+                widget.store.lastBackupAt == null
+                    ? 'Full backup & restore (Not backed up)'
+                    : 'Full backup & restore',
+              ),
+            ),
+            const SizedBox(height: 12),
             TextButton(
               onPressed: () => Navigator.push(
                 context,
@@ -532,13 +550,178 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
       return;
     }
 
-    final confirmed = await confirm(
-      context,
-      'Merge into store inventory?',
-      'New products will be added to your inventory with their quantities. Existing items and their stock are safely preserved, and any missing photos are backfilled.',
-      action: 'Merge into stock',
+    Map<String, dynamic> preview;
+    try {
+      preview = store.previewMerge(r['id']);
+    } catch (e) {
+      showMessage(context, friendlyError(e));
+      return;
+    }
+
+    final stockChanges =
+        (preview['stockChanges'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+    final newProductsCount = preview['newProductsCount'] as int? ?? 0;
+    final newMovementsCount = preview['newMovementsCount'] as int? ?? 0;
+    final backfilledPhotosCount = preview['backfilledPhotosCount'] as int? ?? 0;
+    final isDayRecord = r['kind'] == 'Day record';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.preview_outlined, size: 24),
+            SizedBox(width: 8),
+            Text('Merge preview'),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460, maxHeight: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isDayRecord
+                      ? 'Review incoming day movements and see how your on-hand stock balances will adjust:'
+                      : 'Review new products and quantities to be imported into your store:',
+                  style: const TextStyle(fontSize: 13, color: muted, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                if (stockChanges.isEmpty)
+                  Surface(
+                    color: paper,
+                    padding: const EdgeInsets.all(12),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle_outline, color: avocado, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'No on-hand stock balances will change. Existing items remain at their current counts.',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  const Text(
+                    'Stock balance changes:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Surface(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: Column(
+                      children: [
+                        for (final sc in stockChanges)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              sc['name'] ?? '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (sc['isNew'] == true) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 1,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: avocado.withValues(alpha: .3),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'New item',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '${sc['currentStock']} → ${sc['newStock']}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${(sc['delta'] as int) > 0 ? '+' : ''}${sc['delta']} ${sc['unit']}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: (sc['delta'] as int) < 0
+                                            ? rust
+                                            : const Color(0xFF62643B),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (newProductsCount > 0)
+                      Tag('+$newProductsCount new products', color: avocado),
+                    if (newMovementsCount > 0)
+                      Tag('+$newMovementsCount movements', color: paper),
+                    if (backfilledPhotosCount > 0)
+                      Tag('+$backfilledPhotosCount photos backfilled', color: paper),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Apply merge'),
+          ),
+        ],
+      ),
     );
-    if (!confirmed) return;
+    if (confirmed != true) return;
 
     setState(() => merging = true);
     try {
@@ -751,7 +934,7 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Safely imports new products and movements. Existing items and their stock counts will never be overwritten.',
+                    'Imports new products and day movements. Shows a stock balance preview before changes are applied.',
                     style: TextStyle(fontSize: 11, color: muted, height: 1.4),
                   ),
                   const SizedBox(height: 18),

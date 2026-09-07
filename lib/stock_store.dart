@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:sembast/sembast.dart';
 import 'package:uuid/uuid.dart';
 
@@ -127,12 +128,24 @@ class StockStore extends ChangeNotifier {
   List<Product> _products = [];
   List<Movement> _movements = [];
   List<Map<String, dynamic>> _received = [];
+  List<Map<String, dynamic>> _heldSales = [];
   Map<String, dynamic>? count;
   String shop = 'My store', currency = 'USD';
+  bool setupCompleted = false;
+  String? lastBackupAt;
   bool busy = false;
+
   List<Product> get products => List.unmodifiable(_products);
   List<Movement> get movements => List.unmodifiable(_movements);
   List<Map<String, dynamic>> get received => List.unmodifiable(_received);
+  List<Map<String, dynamic>> get heldSales => List.unmodifiable(_heldSales);
+  List<String> get categories {
+    final set = <String>{};
+    for (final p in _products) {
+      if (p.category.trim().isNotEmpty) set.add(p.category.trim());
+    }
+    return set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
 
   static Future<StockStore> open(Database db) async {
     final record = StoreRef<String, Map<String, dynamic>>(
@@ -152,10 +165,14 @@ class StockStore extends ChangeNotifier {
     'products': _products.map((p) => p.toJson()).toList(),
     'movements': _movements.map((m) => m.toJson()).toList(),
     'received': _received,
+    'heldSales': _heldSales,
     'count': count,
     'shop': shop,
     'currency': currency,
+    'setupCompleted': setupCompleted,
+    'lastBackupAt': lastBackupAt,
   };
+
   void _restore(Map<String, dynamic> data) {
     _products = (data['products'] as List)
         .map((p) => Product.fromJson(Map<String, dynamic>.from(p)))
@@ -166,11 +183,16 @@ class StockStore extends ChangeNotifier {
     _received = (data['received'] as List? ?? [])
         .map((r) => Map<String, dynamic>.from(r))
         .toList();
+    _heldSales = (data['heldSales'] as List? ?? [])
+        .map((h) => Map<String, dynamic>.from(h))
+        .toList();
     count = data['count'] == null
         ? null
         : Map<String, dynamic>.from(data['count']);
     shop = data['shop'] ?? 'My store';
     currency = data['currency'] ?? 'USD';
+    setupCompleted = data['setupCompleted'] ?? (_products.isNotEmpty || _movements.isNotEmpty);
+    lastBackupAt = data['lastBackupAt'];
   }
 
   Future<T> _commit<T>(T Function() change) async {
@@ -215,6 +237,181 @@ class StockStore extends ChangeNotifier {
   int get valuation => _products.fold(0, (n, p) => n + stock(p) * p.cost);
   List<Product> get low =>
       _products.where((p) => stock(p) <= p.threshold).toList();
+
+  Future<void> completeSetup(String storeName, String currencyCode) => _commit(() {
+    if (storeName.trim().isNotEmpty) {
+      shop = storeName.trim();
+    }
+    if (_movements.isEmpty) {
+      currency = currencyCode;
+    }
+    setupCompleted = true;
+  });
+
+  // --- Held Sales ---
+  Future<void> holdSale(Map<String, int> cart, {String note = ''}) => _commit(() {
+    if (cart.isEmpty) throw StateError('Cannot hold an empty sale.');
+    _heldSales.add({
+      'id': newId(),
+      'heldAt': DateTime.now().toUtc().toIso8601String(),
+      'cart': Map<String, int>.from(cart),
+      'note': note.trim(),
+    });
+  });
+
+  Future<Map<String, int>?> resumeSale(String id) => _commit(() {
+    final index = _heldSales.indexWhere((h) => h['id'] == id);
+    if (index < 0) return null;
+    final held = _heldSales.removeAt(index);
+    return Map<String, int>.from(held['cart'] as Map);
+  });
+
+  Future<void> deleteHeldSale(String id) => _commit(() {
+    _heldSales.removeWhere((h) => h['id'] == id);
+  });
+
+  // --- Linked Returns ---
+  Future<void> processReturn({
+    required Movement saleMovement,
+    required int returnQty,
+    required bool returnToStock,
+    required bool refundMoney,
+    String note = '',
+  }) => _commit(() {
+    if (saleMovement.type != 'Sale') {
+      throw StateError('Returns can only be processed on sales.');
+    }
+    final maxReturn = -saleMovement.delta;
+    if (returnQty <= 0 || returnQty > maxReturn) {
+      throw StateError('Invalid return quantity (max $maxReturn).');
+    }
+    final prod = _products.where((p) => p.id == saleMovement.productId).firstOrNull;
+    if (prod == null) {
+      throw StateError('Product no longer exists.');
+    }
+
+    final reason = note.trim().isEmpty ? 'Customer return' : note.trim();
+    final returnRef = 'ret-${saleMovement.reference}';
+
+    if (returnToStock) {
+      _movement(
+        prod,
+        'Return restock',
+        returnQty,
+        '$reason (${refundMoney ? 'Refunded' : 'Exchanged'})',
+        reference: returnRef,
+      );
+    }
+
+    if (refundMoney) {
+      _movement(
+        prod,
+        'Return refund',
+        returnToStock ? 0 : 0, // delta is 0 for cash adjustment only if not restocked or balance adjustment
+        '$reason (Refunded ${moneyString(saleMovement.price * returnQty)})',
+        reference: returnRef,
+      );
+    }
+  });
+
+  // --- Batch Reorder Receiving ---
+  Future<int> batchReceive(Map<String, int> receivedQuantities, {String supplier = ''}) => _commit(() {
+    if (count != null) {
+      throw StateError('Finish or cancel active stock count before receiving goods.');
+    }
+    var totalUnits = 0;
+    final note = supplier.trim().isEmpty ? 'Supplier restock' : 'Delivery from ${supplier.trim()}';
+    for (final entry in receivedQuantities.entries) {
+      final qty = entry.value;
+      if (qty <= 0) continue;
+      final prod = _products.where((p) => p.id == entry.key).firstOrNull;
+      if (prod != null) {
+        _movement(prod, 'Received', qty, note);
+        totalUnits += qty;
+      }
+    }
+    return totalUnits;
+  });
+
+  // --- Business Analytics & Summaries ---
+  List<Movement> movementsInPeriod(DateTime start, DateTime end) {
+    return _movements.where((m) {
+      final at = DateTime.parse(m.at).toLocal();
+      return at.isAfter(start) && at.isBefore(end);
+    }).toList();
+  }
+
+  Map<String, dynamic> businessSummary({int days = 7}) {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year, now.month, now.day).subtract(Duration(days: days - 1));
+    final endDate = now.add(const Duration(days: 1));
+    final periodMovements = movementsInPeriod(startDate, endDate);
+    final sales = periodMovements.where((m) => m.type == 'Sale').toList();
+
+    var totalRevenue = 0;
+    var totalCost = 0;
+    var itemsMissingCost = 0;
+    final itemSalesCount = <String, int>{};
+    final itemSalesRevenue = <String, int>{};
+
+    for (final sale in sales) {
+      final qty = -sale.delta;
+      final rev = qty * sale.price;
+      totalRevenue += rev;
+      totalCost += qty * sale.cost;
+      if (sale.cost <= 0) {
+        itemsMissingCost++;
+      }
+      itemSalesCount[sale.productId] = (itemSalesCount[sale.productId] ?? 0) + qty;
+      itemSalesRevenue[sale.productId] = (itemSalesRevenue[sale.productId] ?? 0) + rev;
+    }
+
+    final estimatedGrossProfit = totalRevenue - totalCost;
+
+    // Top selling items
+    final sortedItemIds = itemSalesCount.keys.toList()
+      ..sort((a, b) => (itemSalesCount[b] ?? 0).compareTo(itemSalesCount[a] ?? 0));
+    final topSellers = sortedItemIds.take(5).map((id) {
+      final p = _products.where((prod) => prod.id == id).firstOrNull;
+      return {
+        'name': p?.name ?? 'Unknown item',
+        'unit': p?.unit ?? 'pcs',
+        'quantity': itemSalesCount[id] ?? 0,
+        'revenue': itemSalesRevenue[id] ?? 0,
+      };
+    }).toList();
+
+    // Slow moving stock: on-hand items with zero sales in the last 14 days
+    final fourteenDaysAgo = now.subtract(const Duration(days: 14));
+    final recentSaleProductIds = _movements
+        .where((m) => m.type == 'Sale' && DateTime.parse(m.at).toLocal().isAfter(fourteenDaysAgo))
+        .map((m) => m.productId)
+        .toSet();
+
+    final slowMovers = _products
+        .where((p) => stock(p) > 0 && !recentSaleProductIds.contains(p.id))
+        .map((p) => {
+              'id': p.id,
+              'name': p.name,
+              'stock': stock(p),
+              'unit': p.unit,
+              'valuation': stock(p) * p.cost,
+            })
+        .toList();
+
+    return {
+      'periodDays': days,
+      'salesCount': sales.length,
+      'totalRevenue': totalRevenue,
+      'estimatedGrossProfit': estimatedGrossProfit,
+      'itemsMissingCost': itemsMissingCost,
+      'topSellers': topSellers,
+      'slowMovers': slowMovers,
+    };
+  }
+
+  String moneyString(int cents) =>
+      NumberFormat.simpleCurrency(name: currency).format(cents / 100);
 
   void _movement(
     Product p,
@@ -277,8 +474,8 @@ class StockStore extends ChangeNotifier {
   });
 
   Future<void> deleteProduct(String id) => _commit(() {
-    if (count != null) {
-      throw StateError('Finish or cancel the active count before deleting items.');
+    if (count != null && (count!['baseline'] as Map).containsKey(id)) {
+      throw StateError('Finish or cancel the active count before deleting this item.');
     }
     final p = _products.where((item) => item.id == id).firstOrNull;
     if (p == null) {
@@ -300,9 +497,9 @@ class StockStore extends ChangeNotifier {
     String note, {
     String? photo,
   }) => _commit(() {
-    if (count != null) {
+    if (count != null && (count!['baseline'] as Map).containsKey(p.id)) {
       throw StateError(
-        'Finish or cancel the active count before changing stock.',
+        'Finish or cancel the active count for ${p.name} before changing its stock.',
       );
     }
     final current = product(p.id);
@@ -316,12 +513,17 @@ class StockStore extends ChangeNotifier {
     }
     _movement(current, type, quantity, note.trim(), photo: photo);
   });
-  Future<void> checkout(Map<String, int> cart, String note, {String? photo}) =>
+  Future<String> checkout(Map<String, int> cart, String note, {String? photo}) =>
       _commit(() {
         if (count != null) {
-          throw StateError(
-            'Finish or cancel the active stock count before selling.',
-          );
+          final counted = count!['baseline'] as Map;
+          final blocked = cart.keys.where((k) => counted.containsKey(k)).toList();
+          if (blocked.isNotEmpty) {
+            final names = blocked.map((k) => product(k).name).join(', ');
+            throw StateError(
+              'Cannot sell items currently being counted: $names. Finish or cancel the count first.',
+            );
+          }
         }
         if (cart.isEmpty) throw StateError('Add an item to the sale.');
         for (final line in cart.entries) {
@@ -340,17 +542,43 @@ class StockStore extends ChangeNotifier {
             photo: photo,
           );
         }
+        return ref;
       });
-  Future<void> startCount() => _commit(() {
+  Future<void> startCount({String? category, List<String>? productIds}) => _commit(() {
     if (_products.isEmpty) {
       throw StateError('Add products before starting a count.');
     }
     if (count != null) throw StateError('A count is already active.');
+
+    var targetProducts = _products;
+    String scopeLabel = 'All items';
+
+    if (category != null &&
+        category.trim().isNotEmpty &&
+        category != 'All items' &&
+        category != 'All') {
+      targetProducts = _products
+          .where((p) => p.category.toLowerCase() == category.trim().toLowerCase())
+          .toList();
+      if (targetProducts.isEmpty) {
+        throw StateError('No products found in category "$category".');
+      }
+      scopeLabel = category.trim();
+    } else if (productIds != null && productIds.isNotEmpty) {
+      final idSet = productIds.toSet();
+      targetProducts = _products.where((p) => idSet.contains(p.id)).toList();
+      if (targetProducts.isEmpty) {
+        throw StateError('No matching products found for the count.');
+      }
+      scopeLabel = 'Selected products';
+    }
+
     count = {
       'id': newId(),
       'at': DateTime.now().toUtc().toIso8601String(),
-      'baseline': {for (final p in _products) p.id: stock(p)},
-      'names': {for (final p in _products) p.id: p.name},
+      'scope': scopeLabel,
+      'baseline': {for (final p in targetProducts) p.id: stock(p)},
+      'names': {for (final p in targetProducts) p.id: p.name},
       'values': <String, dynamic>{},
     };
   });
@@ -391,21 +619,66 @@ class StockStore extends ChangeNotifier {
       }
     }
     // Keep the reviewed snapshot even when every variance is zero.
+    final scope = (count!['scope'] as String?) ?? 'All items';
     _received.add({
-      'kind': 'Posted count',
+      'kind': scope == 'All items' ? 'Posted count' : 'Posted count ($scope)',
       'shop': shop,
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'id': count!['id'],
+      'scope': scope,
       'count': jsonDecode(jsonEncode(count)),
     });
     count = null;
   });
   Future<void> settings(String name, String code) => _commit(() {
-    if (_movements.isNotEmpty && currency != code) {
-      throw StateError('Currency cannot change after stock has been recorded.');
-    }
     shop = name.trim().isEmpty ? 'My store' : name.trim();
     currency = code;
+  });
+
+  Map<String, dynamic> fullBackup() {
+    final now = DateTime.now().toUtc().toIso8601String();
+    return {
+      'format': 'stockmix-full-backup',
+      'version': 1,
+      'createdAt': now,
+      'shop': shop,
+      'currency': currency,
+      'products': _products.map((p) => p.toJson()).toList(),
+      'movements': _movements.map((m) => m.toJson()).toList(),
+      'received': _received,
+      'count': count,
+      'heldSales': _heldSales,
+    };
+  }
+
+  Future<void> markBackupCompleted() => _commit(() {
+    lastBackupAt = DateTime.now().toUtc().toIso8601String();
+  });
+
+  Future<void> restoreFullBackup(Map<String, dynamic> data) => _commit(() {
+    if (data['format'] != 'stockmix-full-backup' || data['version'] != 1) {
+      throw const FormatException('Invalid Stockmix backup file.');
+    }
+    if (data['products'] is! List || data['movements'] is! List) {
+      throw const FormatException('Backup file is missing required inventory data.');
+    }
+    _products = (data['products'] as List)
+        .map((p) => Product.fromJson(Map<String, dynamic>.from(p)))
+        .toList();
+    _movements = (data['movements'] as List)
+        .map((m) => Movement.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+    _received = (data['received'] as List? ?? [])
+        .map((r) => Map<String, dynamic>.from(r))
+        .toList();
+    _heldSales = (data['heldSales'] as List? ?? [])
+        .map((h) => Map<String, dynamic>.from(h))
+        .toList();
+    count = data['count'] == null ? null : Map<String, dynamic>.from(data['count']);
+    shop = data['shop'] ?? 'My store';
+    currency = data['currency'] ?? 'USD';
+    setupCompleted = true;
+    lastBackupAt = DateTime.now().toUtc().toIso8601String();
   });
 
   Map<String, dynamic> bundle({
@@ -747,6 +1020,130 @@ class StockStore extends ChangeNotifier {
     };
   });
 
+  Map<String, dynamic> previewMerge(
+    String id, {
+    bool addProducts = true,
+    bool importMovements = true,
+  }) {
+    final recordIndex = _received.indexWhere((r) => r['id'] == id);
+    if (recordIndex < 0) {
+      throw StateError('Received record not found.');
+    }
+    final record = _received[recordIndex];
+    if (record['currency'] != currency) {
+      throw StateError(
+        'Cannot merge: File currency (${record['currency']}) differs from your store ($currency).',
+      );
+    }
+    if (count != null) {
+      throw StateError('Finish the stock count before merging records.');
+    }
+
+    final stockChanges = <Map<String, dynamic>>[];
+    final addedProducts = <String, Map<String, dynamic>>{};
+    int newProductsCount = 0;
+    int backfilledPhotosCount = 0;
+    int skippedProductsCount = 0;
+    int newMovementsCount = 0;
+    int skippedMovementsCount = 0;
+
+    if (addProducts && record['products'] is List) {
+      for (final item in record['products']) {
+        final p = Product.fromJson(Map<String, dynamic>.from(item));
+        final existing = _products.where(
+          (e) =>
+              e.id == p.id ||
+              (p.barcode.isNotEmpty &&
+                  normalizeCode(e.barcode) == normalizeCode(p.barcode)),
+        ).firstOrNull;
+
+        if (existing != null) {
+          if (existing.photo == null && p.photo != null) {
+            backfilledPhotosCount++;
+          } else {
+            skippedProductsCount++;
+          }
+        } else {
+          newProductsCount++;
+          final initialQty = (item['onHand'] as int?) ?? p.opening;
+          final change = {
+            'productId': p.id,
+            'name': p.name,
+            'unit': p.unit,
+            'currentStock': 0,
+            'delta': initialQty,
+            'newStock': initialQty,
+            'isNew': true,
+          };
+          stockChanges.add(change);
+          addedProducts[p.id] = change;
+        }
+      }
+    }
+
+    if (importMovements &&
+        record['kind'] == 'Day record' &&
+        record['movements'] is List) {
+      final movementDeltas = <String, int>{};
+      for (final item in record['movements']) {
+        final m = Movement.fromJson(Map<String, dynamic>.from(item));
+        final isDup = _movements.any(
+          (existing) =>
+              existing.id == m.id ||
+              (existing.reference == m.reference &&
+                  existing.productId == m.productId &&
+                  existing.delta == m.delta),
+        );
+        if (isDup) {
+          skippedMovementsCount++;
+          continue;
+        }
+        final productExists =
+            _products.any((p) => p.id == m.productId) || addedProducts.containsKey(m.productId);
+        if (productExists) {
+          movementDeltas[m.productId] = (movementDeltas[m.productId] ?? 0) + m.delta;
+          newMovementsCount++;
+        }
+      }
+
+      for (final entry in movementDeltas.entries) {
+        final pId = entry.key;
+        final delta = entry.value;
+        if (delta == 0) continue;
+
+        if (addedProducts.containsKey(pId)) {
+          final sc = addedProducts[pId]!;
+          final initialDelta = sc['delta'] as int;
+          final totalDelta = initialDelta + delta;
+          sc['delta'] = totalDelta;
+          sc['newStock'] = totalDelta;
+        } else {
+          final p = product(pId);
+          final current = stock(p);
+          stockChanges.add({
+            'productId': p.id,
+            'name': p.name,
+            'unit': p.unit,
+            'currentStock': current,
+            'delta': delta,
+            'newStock': current + delta,
+            'isNew': false,
+          });
+        }
+      }
+    }
+
+    return {
+      'record': record,
+      'stockChanges': stockChanges,
+      'newProductsCount': newProductsCount,
+      'backfilledPhotosCount': backfilledPhotosCount,
+      'skippedProductsCount': skippedProductsCount,
+      'newMovementsCount': newMovementsCount,
+      'skippedMovementsCount': skippedMovementsCount,
+    };
+  }
+
   String csv({DateTime? day}) {
     String cell(Object? v) {
       var text = '${v ?? ''}';
@@ -858,5 +1255,6 @@ class StockStore extends ChangeNotifier {
       'Sample cash sale',
       reference: 'demo-sale',
     );
+    setupCompleted = true;
   });
 }

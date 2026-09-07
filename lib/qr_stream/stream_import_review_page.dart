@@ -123,8 +123,9 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
                       children: [
                         Text(
                           'Streamed at ${DateFormat('d MMM yyyy · h:mm a').format(analysis.exportedAt.toLocal())}',
@@ -177,7 +178,9 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                             children: [
                               Icon(Icons.add_circle_outline, size: 18, color: plum),
                               SizedBox(width: 6),
-                              Text('New to your store', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                              Expanded(
+                                child: Text('New to your store', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -207,7 +210,9 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                             children: [
                               Icon(Icons.copy_all_outlined, size: 18, color: rust),
                               SizedBox(width: 6),
-                              Text('Duplicates detected', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                              Expanded(
+                                child: Text('Duplicates detected', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 10),

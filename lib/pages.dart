@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'backup_page.dart';
 import 'design.dart';
 import 'forms.dart';
+import 'invoice_page.dart';
 import 'operations.dart';
+import 'reorder_page.dart';
 import 'scanner_page.dart';
 import 'sharing.dart';
 import 'stock_store.dart';
@@ -24,7 +27,99 @@ class _StockShellState extends State<StockShell> {
   String search = '', category = 'All items';
   bool lowOnly = false;
   DateTime day = DateTime.now();
+  int recordsMode = 0;
+  int insightsDays = 7;
   StockStore get store => widget.store;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<void> _showFirstTimeSetup() async {
+    final name = TextEditingController(text: store.shop == 'My store' ? '' : store.shop);
+    var currency = store.currency;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: avocado.withAlpha(60),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.storefront_outlined, color: plum, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Text('Welcome to Stockmix', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Set up your store name and local currency. You can change this at any time in settings without affecting your product records.',
+                  style: TextStyle(color: muted, fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: name,
+                  maxLength: 60,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Store or shop name',
+                    hintText: 'e.g. Maya\'s Corner Grocery',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: currency,
+                  decoration: const InputDecoration(labelText: 'Store currency'),
+                  items: const [
+                    DropdownMenuItem(value: 'USD', child: Text('USD (\$) - US Dollar', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'EUR', child: Text('EUR (€) - Euro', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'GBP', child: Text('GBP (£) - British Pound', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'PHP', child: Text('PHP (₱) - Philippine Peso', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'INR', child: Text('INR (₹) - Indian Rupee', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'NGN', child: Text('NGN (₦) - Nigerian Naira', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'KES', child: Text('KES (KSh) - Kenyan Shilling', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'GHS', child: Text('GHS (GH₵) - Ghanaian Cedi', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'ZAR', child: Text('ZAR (R) - South African Rand', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'CAD', child: Text('CAD (\$) - Canadian Dollar', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'AUD', child: Text('AUD (\$) - Australian Dollar', overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: (v) => update(() => currency = v!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Later'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == true) {
+      await store.completeSetup(name.text, currency);
+    }
+  }
+
   void open(Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   Future<void> scan() async {
@@ -56,7 +151,7 @@ class _StockShellState extends State<StockShell> {
     animation: store,
     builder: (context, _) {
       final wide = MediaQuery.sizeOf(context).width >= 1000;
-      return Scaffold(
+      final shell = Scaffold(
         body: Row(
           children: [
             if (wide) sidebar(),
@@ -92,6 +187,15 @@ class _StockShellState extends State<StockShell> {
           ],
         ),
         bottomNavigationBar: wide ? null : bottomNav(),
+      );
+      return PopScope(
+        canPop: tab == 0,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop && tab != 0) {
+            setState(() => tab = 0);
+          }
+        },
+        child: shell,
       );
     },
   );
@@ -457,12 +561,55 @@ class _StockShellState extends State<StockShell> {
           Icons.trending_down_rounded,
           'Need a little attention',
           '${store.low.length}',
-          'items running low',
+          store.low.isEmpty ? 'All stocked up' : 'items running low · Tap to reorder',
           maple,
+          onTap: () => open(ReorderPage(store: store)),
         ),
       ],
     );
     return [
+      if (!store.setupCompleted && store.movements.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 22),
+          child: Surface(
+            color: avocado.withAlpha(55),
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: avocado,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.storefront_outlined, color: plum, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Set your store currency',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Store currency is currently ${store.currency}. Set your preferred store currency.',
+                        style: const TextStyle(color: muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: _showFirstTimeSetup,
+                  child: const Text('Configure'),
+                ),
+              ],
+            ),
+          ),
+        ),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -519,12 +666,13 @@ class _StockShellState extends State<StockShell> {
                 'Low stock',
                 '${store.low.length}',
                 Icons.trending_down_rounded,
+                onTap: () => open(ReorderPage(store: store)),
               ),
             ),
           ],
         ),
       ],
-      section('A little shortcut'),
+      section('Quick actions'),
       Row(
         children: [
           quickAction(
@@ -557,10 +705,10 @@ class _StockShellState extends State<StockShell> {
             children: [
               const Icon(Icons.pause_circle_outline),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Stock count in progress. Stock changes are paused.',
-                  style: TextStyle(fontSize: 12),
+                  'Stock count in progress (${store.count?['scope'] ?? 'All items'}). Counted items are paused.',
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
               TextButton(
@@ -572,9 +720,13 @@ class _StockShellState extends State<StockShell> {
         ),
       ],
       section(
-        'On your radar',
-        action: 'View inventory →',
-        onTap: () => setState(() => tab = 1),
+        'Needs restocking',
+        action: store.low.isNotEmpty
+            ? 'Shopping list (${store.low.length}) →'
+            : 'View inventory →',
+        onTap: () => store.low.isNotEmpty
+            ? open(ReorderPage(store: store))
+            : setState(() => tab = 1),
       ),
       if (store.products.isEmpty)
         Surface(
@@ -635,76 +787,102 @@ class _StockShellState extends State<StockShell> {
     String label,
     String value,
     String detail,
-    Color color,
-  ) => Surface(
-    padding: const EdgeInsets.all(19),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: .25),
-            borderRadius: BorderRadius.circular(15),
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    final content = Surface(
+      padding: const EdgeInsets.all(19),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .25),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(icon, size: 23),
           ),
-          child: Icon(icon, size: 23),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 11, color: muted)),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 29,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        detail,
+                        style: const TextStyle(fontSize: 10, color: muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (onTap != null)
+            const Icon(Icons.chevron_right, color: muted, size: 20),
+        ],
+      ),
+    );
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: content,
+      );
+    }
+    return content;
+  }
+
+  Widget compactStat(String label, String value, IconData icon, {VoidCallback? onTap}) {
+    final content = Surface(
+      padding: const EdgeInsets.all(17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: muted)),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 29,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      detail,
-                      style: const TextStyle(fontSize: 10, color: muted),
-                    ),
-                  ),
-                ],
-              ),
+              Icon(icon, color: muted, size: 16),
+              const SizedBox(width: 7),
+              Expanded(child: Text(label, style: const TextStyle(color: muted, fontSize: 11))),
+              if (onTap != null)
+                const Icon(Icons.chevron_right, color: muted, size: 14),
             ],
           ),
-        ),
-      ],
-    ),
-  );
-  Widget compactStat(String label, String value, IconData icon) => Surface(
-    padding: const EdgeInsets.all(17),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: muted, size: 16),
-            const SizedBox(width: 7),
-            Text(label, style: const TextStyle(color: muted, fontSize: 11)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 27,
-            fontWeight: FontWeight.w800,
-            height: 1,
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: content,
+      );
+    }
+    return content;
+  }
   Widget quickAction(
     String label,
     IconData icon,
@@ -878,24 +1056,39 @@ class _StockShellState extends State<StockShell> {
         ),
       ),
       const SizedBox(height: 8),
-      Row(
+      Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 6,
         children: [
-          Expanded(
-            child: Text(
-              '${filtered.length} ITEMS',
-              style: const TextStyle(
-                fontSize: 10,
-                color: muted,
-                letterSpacing: 1.3,
-                fontWeight: FontWeight.w700,
-              ),
+          Text(
+            '${filtered.length} ITEMS',
+            style: const TextStyle(
+              fontSize: 10,
+              color: muted,
+              letterSpacing: 1.3,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          FilterChip(
-            label: const Text('Low stock', style: TextStyle(fontSize: 11)),
-            selected: lowOnly,
-            selectedColor: avocado,
-            onSelected: (v) => setState(() => lowOnly = v),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilterChip(
+                label: const Text('Low stock', style: TextStyle(fontSize: 11)),
+                selected: lowOnly,
+                selectedColor: avocado,
+                onSelected: (v) => setState(() => lowOnly = v),
+              ),
+              if (store.low.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.playlist_add_check_outlined, size: 16),
+                  label: Text('Shopping list (${store.low.length})', style: const TextStyle(fontSize: 11)),
+                  onPressed: () => open(ReorderPage(store: store)),
+                ),
+            ],
           ),
         ],
       ),
@@ -1030,98 +1223,404 @@ class _StockShellState extends State<StockShell> {
         'Your sales and stock changes, in one place.',
         style: TextStyle(color: muted, fontSize: 12),
       ),
-      const SizedBox(height: 25),
-      Surface(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous day',
-              onPressed: () =>
-                  setState(() => day = day.subtract(const Duration(days: 1))),
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: TextButton.icon(
-                onPressed: () async {
-                  final value = await showDatePicker(
-                    context: context,
-                    initialDate: day,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime.now(),
-                  );
-                  if (value != null) setState(() => day = value);
-                },
-                icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text(
-                  DateFormat('EEE, d MMM yyyy').format(day),
-                  style: const TextStyle(fontSize: 13),
+      const SizedBox(height: 20),
+      SegmentedButton<int>(
+        segments: const [
+          ButtonSegment(
+            value: 0,
+            label: Text('Daily activity'),
+            icon: Icon(Icons.receipt_long_outlined, size: 18),
+          ),
+          ButtonSegment(
+            value: 1,
+            label: Text('Business summary'),
+            icon: Icon(Icons.insights_outlined, size: 18),
+          ),
+        ],
+        selected: {recordsMode},
+        onSelectionChanged: (s) => setState(() => recordsMode = s.first),
+      ),
+      const SizedBox(height: 20),
+      if (recordsMode == 0) ...[
+        Surface(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Previous day',
+                onPressed: () =>
+                    setState(() => day = day.subtract(const Duration(days: 1))),
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final value = await showDatePicker(
+                      context: context,
+                      initialDate: day,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (value != null) setState(() => day = value);
+                  },
+                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                  label: Text(
+                    DateFormat('EEE, d MMM yyyy').format(day),
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              tooltip: 'Next day',
-              onPressed: dayKey(day) == dayKey(DateTime.now())
-                  ? null
-                  : () =>
-                        setState(() => day = day.add(const Duration(days: 1))),
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
+              IconButton(
+                tooltip: 'Next day',
+                onPressed: dayKey(day) == dayKey(DateTime.now())
+                    ? null
+                    : () =>
+                          setState(() => day = day.add(const Duration(days: 1))),
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 18),
-      Surface(
-        color: avocado,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 18),
+        Surface(
+          color: avocado,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Eyebrow('Sales recorded', color: plum),
+                    const SizedBox(height: 10),
+                    Text(
+                      money(store, store.revenue(day)),
+                      style: Theme.of(context).textTheme.headlineLarge,
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Eyebrow('Sales recorded', color: plum),
-                  const SizedBox(height: 10),
                   Text(
-                    money(store, store.revenue(day)),
-                    style: Theme.of(context).textTheme.headlineLarge,
+                    '${entries.length}',
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
+                  const Text('stock movements', style: TextStyle(fontSize: 11)),
                 ],
               ),
+            ],
+          ),
+        ),
+        section('The day’s activity'),
+        if (entries.isEmpty)
+          const Surface(
+            child: EmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: 'A quiet page so far.',
+              subtitle:
+                  'Sales, receipts, and stock adjustments for this day will appear here.',
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${entries.length}',
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const Text('stock movements', style: TextStyle(fontSize: 11)),
+          )
+        else
+          ...entries.map((m) => MovementTile(movement: m, store: store)),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: () => open(SharePage(store: store, initialDay: day)),
+          icon: const Icon(Icons.ios_share_outlined, size: 19),
+          label: const Text('Share or export this day'),
+        ),
+      ] else ...[
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Performance overview',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 7, label: Text('7 days')),
+                ButtonSegment(value: 30, label: Text('30 days')),
               ],
+              selected: {insightsDays},
+              onSelectionChanged: (s) => setState(() => insightsDays = s.first),
             ),
           ],
         ),
-      ),
-      section('The day’s activity'),
-      if (entries.isEmpty)
-        const Surface(
-          child: EmptyState(
-            icon: Icons.receipt_long_outlined,
-            title: 'A quiet page so far.',
-            subtitle:
-                'Sales, receipts, and stock adjustments for this day will appear here.',
-          ),
-        )
-      else
-        ...entries.map((m) => MovementTile(movement: m, store: store)),
-      const SizedBox(height: 24),
-      FilledButton.icon(
-        onPressed: () => open(SharePage(store: store, initialDay: day)),
-        icon: const Icon(Icons.ios_share_outlined, size: 19),
-        label: const Text('Share or export this day'),
-      ),
+        const SizedBox(height: 16),
+        Builder(
+          builder: (context) {
+            final summary = store.businessSummary(days: insightsDays);
+            final int revenue = summary['totalRevenue'] ?? 0;
+            final int grossProfit = summary['estimatedGrossProfit'] ?? 0;
+            final int missingCost = summary['itemsMissingCost'] ?? 0;
+            final List topSellers = summary['topSellers'] as List? ?? [];
+            final List slowMovers = summary['slowMovers'] as List? ?? [];
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Surface(
+                        color: plum,
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Eyebrow('Total sales', color: avocado),
+                            const SizedBox(height: 8),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                money(store, revenue),
+                                style: const TextStyle(
+                                  color: paper,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${summary['salesCount']} sales in $insightsDays days',
+                              style: const TextStyle(
+                                color: Color(0xFFCCC5CB),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Surface(
+                        color: avocado,
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Eyebrow('Est. gross profit', color: plum),
+                            const SizedBox(height: 8),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                money(store, grossProfit),
+                                style: const TextStyle(
+                                  color: plum,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Revenue minus product costs',
+                              style: TextStyle(color: plum, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (missingCost > 0) ...[
+                  const SizedBox(height: 12),
+                  Surface(
+                    color: linen,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: muted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$missingCost sales lacked a cost price. Estimated profit calculates using known costs.',
+                            style: const TextStyle(fontSize: 11, color: muted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                section('Top selling items'),
+                if (topSellers.isEmpty)
+                  const Surface(
+                    child: EmptyState(
+                      icon: Icons.trending_up,
+                      title: 'No sales recorded yet',
+                      subtitle:
+                          'Sales in this period will rank your best-selling items here.',
+                    ),
+                  )
+                else
+                  Surface(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < topSellers.length; i++) ...[
+                          if (i > 0) const Divider(height: 1),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 28,
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: i == 0 ? avocado : linen,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${i + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: i == 0 ? plum : muted,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        topSellers[i]['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${topSellers[i]['quantity']} ${topSellers[i]['unit']} sold',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  money(store, topSellers[i]['revenue']),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                section('Slow-moving items (14+ days)'),
+                const Text(
+                  'Items currently in stock with zero recorded sales in the last 14 days.',
+                  style: TextStyle(color: muted, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                if (slowMovers.isEmpty)
+                  const Surface(
+                    child: EmptyState(
+                      icon: Icons.check_circle_outline,
+                      title: 'Healthy movement',
+                      subtitle:
+                          'No stagnant items found. Everything in stock has had sales recently!',
+                    ),
+                  )
+                else
+                  Surface(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < slowMovers.length; i++) ...[
+                          if (i > 0) const Divider(height: 1),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.hourglass_empty_rounded,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        slowMovers[i]['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${slowMovers[i]['stock']} ${slowMovers[i]['unit']} in stock',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      money(store, slowMovers[i]['valuation']),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    const Text(
+                                      'tied in stock',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     ];
   }
 
@@ -1144,6 +1643,22 @@ class _StockShellState extends State<StockShell> {
             'Store settings',
             '${store.shop} · ${store.currency}',
             settings,
+          ),
+          menu(
+            Icons.backup_outlined,
+            'Full backup & restore',
+            store.lastBackupAt == null
+                ? 'Never backed up · Tap to protect data'
+                : 'Last backed up: ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(store.lastBackupAt!).toLocal())}',
+            () => open(BackupRestorePage(store: store)),
+          ),
+          menu(
+            Icons.playlist_add_check_outlined,
+            'Shopping & reorder list',
+            store.low.isEmpty
+                ? 'All stocked up · No low stock items'
+                : '${store.low.length} items running low · Tap to order',
+            () => open(ReorderPage(store: store)),
           ),
           menu(
             Icons.swap_horiz_rounded,
@@ -1294,13 +1809,11 @@ class _StockShellState extends State<StockShell> {
                         ]
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
-                onChanged: store.movements.isEmpty
-                    ? (v) => update(() => currency = v!)
-                    : null,
+                onChanged: (v) => update(() => currency = v!),
               ),
               const SizedBox(height: 10),
               const Text(
-                'Currency is locked after the first stock movement to keep historical prices consistent.',
+                'Changing currency updates the symbol across items, receipts, and reports. No exchange rate conversion is applied.',
                 style: TextStyle(color: muted, fontSize: 11),
               ),
             ],
@@ -1446,6 +1959,46 @@ class MovementTile extends StatelessWidget {
                       'Reference: ${m.reference}',
                       style: const TextStyle(fontSize: 10, color: muted),
                     ),
+                    if (m.type == 'Sale') ...[
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ReceiptInvoicePage.fromMovement(
+                                      store: store,
+                                      movement: m,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                              label: const Text('Share receipt'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: rust,
+                                foregroundColor: paper,
+                              ),
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                _showReturnDialog(context);
+                              },
+                              icon: const Icon(Icons.replay_outlined, size: 18),
+                              label: const Text('Process return'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1454,6 +2007,104 @@ class MovementTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showReturnDialog(BuildContext context) async {
+    final m = movement;
+    final maxReturn = -m.delta;
+    var returnQty = 1;
+    var returnToStock = true;
+    var refundMoney = true;
+    final noteController = TextEditingController(text: 'Customer return');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Return ${m.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Original purchase: $maxReturn units at ${money(store, m.price)} each.',
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Quantity to return', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: returnQty > 1 ? () => setDialogState(() => returnQty--) : null,
+                      ),
+                      Text('$returnQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: returnQty < maxReturn ? () => setDialogState(() => returnQty++) : null,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(height: 18),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Return item to store shelf', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  returnToStock ? 'Stock will increase by $returnQty' : 'Item is damaged or discarded; stock unchanged',
+                  style: const TextStyle(fontSize: 11, color: muted),
+                ),
+                value: returnToStock,
+                onChanged: (val) => setDialogState(() => returnToStock = val),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Refund customer cash', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  refundMoney ? 'Refund total: ${money(store, m.price * returnQty)}' : 'Customer exchange or store credit',
+                  style: const TextStyle(fontSize: 11, color: muted),
+                ),
+                value: refundMoney,
+                onChanged: (val) => setDialogState(() => refundMoney = val),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(labelText: 'Reason for return'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm return'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        await store.processReturn(
+          saleMovement: m,
+          returnQty: returnQty,
+          returnToStock: returnToStock,
+          refundMoney: refundMoney,
+          note: noteController.text,
+        );
+        if (context.mounted) {
+          showMessage(context, 'Return processed successfully.');
+        }
+      } catch (e) {
+        if (context.mounted) showMessage(context, friendlyError(e));
+      }
+    }
   }
 }
 

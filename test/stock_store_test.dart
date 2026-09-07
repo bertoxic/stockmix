@@ -360,4 +360,297 @@ void main() {
     expect(store.products, isEmpty);
     expect(store.movements, isEmpty);
   });
+
+  test('first-time setup completes and currency can be changed even after movements', () async {
+    expect(store.setupCompleted, isFalse);
+    await store.completeSetup('Maya Grocery', 'PHP');
+    expect(store.shop, 'Maya Grocery');
+    expect(store.currency, 'PHP');
+    expect(store.setupCompleted, isTrue);
+
+    // Save product and movement
+    final p = item();
+    await store.saveProduct(p);
+    expect(store.movements, isNotEmpty);
+
+    // Changing currency is allowed anytime without exchange rate conversion
+    await store.settings('Maya Grocery', 'USD');
+    expect(store.currency, 'USD');
+  });
+
+  test('full backup and restore recovers all store data and settings', () async {
+    await store.completeSetup('Corner Shop', 'EUR');
+    final p1 = item(id: 'p1', name: 'Almond Milk', opening: 10);
+    await store.saveProduct(p1);
+    await store.checkout({p1.id: 2}, 'Customer sale');
+    await store.holdSale({p1.id: 3}, note: 'Customer stepped out');
+
+    final backup = store.fullBackup();
+    expect(backup['format'], 'stockmix-full-backup');
+    expect(backup['shop'], 'Corner Shop');
+    expect(backup['currency'], 'EUR');
+    expect(backup['products'], hasLength(1));
+    expect(backup['movements'], hasLength(2)); // opening + sale
+    expect(backup['heldSales'], hasLength(1));
+
+    // Restore on fresh store
+    final newStore = StockStore(persist: (_) async {});
+    await newStore.restoreFullBackup(backup);
+
+    expect(newStore.shop, 'Corner Shop');
+    expect(newStore.currency, 'EUR');
+    expect(newStore.setupCompleted, isTrue);
+    expect(newStore.products, hasLength(1));
+    expect(newStore.stock(newStore.product('p1')), 8);
+    expect(newStore.heldSales, hasLength(1));
+    expect(newStore.lastBackupAt, isNotNull);
+  });
+
+  test('holdSale, resumeSale, and deleteHeldSale workflow', () async {
+    final p = item();
+    await store.saveProduct(p);
+
+    // Cannot hold empty sale
+    await expectLater(store.holdSale({}), throwsStateError);
+
+    // Hold sale
+    await store.holdSale({p.id: 4}, note: 'Customer fetching wallet');
+    expect(store.heldSales, hasLength(1));
+    final heldId = store.heldSales.first['id'] as String;
+
+    // Resume sale returns cart and removes from held
+    final resumedCart = await store.resumeSale(heldId);
+    expect(resumedCart, {p.id: 4});
+    expect(store.heldSales, isEmpty);
+
+    // Hold another and delete
+    await store.holdSale({p.id: 2});
+    expect(store.heldSales, hasLength(1));
+    await store.deleteHeldSale(store.heldSales.first['id'] as String);
+    expect(store.heldSales, isEmpty);
+  });
+
+  test('processReturn links to sale and creates restock and refund movements', () async {
+    final p = item(opening: 10, price: 500);
+    await store.saveProduct(p);
+    final ref = await store.checkout({p.id: 3}, 'Cash');
+    expect(ref, isNotEmpty);
+    expect(store.stock(p), 7);
+
+    final saleMovement = store.movements.firstWhere((m) => m.type == 'Sale');
+    expect(saleMovement.reference, ref);
+
+    // Return 2 units with restock and refund
+    await store.processReturn(
+      saleMovement: saleMovement,
+      returnQty: 2,
+      returnToStock: true,
+      refundMoney: true,
+      note: 'Damaged packaging but accepted',
+    );
+
+    // Stock should be 7 + 2 = 9
+    expect(store.stock(p), 9);
+    expect(
+      store.movements.any((m) => m.type == 'Return restock' && m.delta == 2),
+      isTrue,
+    );
+    expect(
+      store.movements.any((m) => m.type == 'Return refund'),
+      isTrue,
+    );
+  });
+
+  test('batchReceive stocks multiple items from supplier in one step', () async {
+    final p1 = item(id: 'p1', name: 'Item 1', code: 'CODE111', opening: 2);
+    final p2 = item(id: 'p2', name: 'Item 2', code: 'CODE222', opening: 5);
+    await store.saveProduct(p1);
+    await store.saveProduct(p2);
+
+    final total = await store.batchReceive(
+      {p1.id: 10, p2.id: 20},
+      supplier: 'Ace Wholesale',
+    );
+
+    expect(total, 30);
+    expect(store.stock(p1), 12);
+    expect(store.stock(p2), 25);
+    expect(
+      store.movements.where((m) => m.note.contains('Ace Wholesale')),
+      hasLength(2),
+    );
+  });
+
+  test('businessSummary calculates revenue, gross profit, missing costs, top sellers, and slow movers', () async {
+    // p1 has cost 200, price 500
+    final p1 = item(id: 'p1', name: 'Top Seller', code: 'CODE100', opening: 50, price: 500);
+    // p2 has cost 0, price 300 (missing cost)
+    final p2 = Product(
+      id: 'p2',
+      name: 'Item With Missing Cost',
+      category: 'Pantry',
+      barcode: 'P222',
+      price: 300,
+      cost: 0,
+      opening: 20,
+      threshold: 5,
+    );
+    // p3 has stock but will have 0 sales (slow mover)
+    final p3 = item(id: 'p3', name: 'Slow Mover', code: 'CODE300', opening: 15);
+
+    await store.saveProduct(p1);
+    await store.saveProduct(p2);
+    await store.saveProduct(p3);
+
+    // Sell 10 of p1 (rev: 5000, cost: 2000, profit: 3000)
+    await store.checkout({p1.id: 10}, 'Sale 1');
+    // Sell 5 of p2 (rev: 1500, cost: 0, missing cost item)
+    await store.checkout({p2.id: 5}, 'Sale 2');
+
+    final summary = store.businessSummary(days: 7);
+
+    expect(summary['totalRevenue'], 6500);
+    expect(summary['estimatedGrossProfit'], 4500); // 6500 - 2000
+    expect(summary['itemsMissingCost'], 1);
+    expect(summary['salesCount'], 2);
+
+    final topSellers = summary['topSellers'] as List;
+    expect(topSellers.first['name'], 'Top Seller');
+    expect(topSellers.first['quantity'], 10);
+
+    final slowMovers = summary['slowMovers'] as List;
+    expect(slowMovers.any((m) => m['name'] == 'Slow Mover'), isTrue);
+    expect(slowMovers.any((m) => m['name'] == 'Top Seller'), isFalse);
+  });
+
+  test('scoped count allows sales of uncounted products while locking counted items', () async {
+    final dairy = Product(
+      id: 'p_milk',
+      name: 'Milk',
+      category: 'Dairy',
+      barcode: '111',
+      price: 200,
+      cost: 100,
+      opening: 10,
+      threshold: 2,
+    );
+    final bakery = Product(
+      id: 'p_bread',
+      name: 'Bread',
+      category: 'Bakery',
+      barcode: '222',
+      price: 150,
+      cost: 70,
+      opening: 5,
+      threshold: 1,
+    );
+    await store.saveProduct(dairy);
+    await store.saveProduct(bakery);
+
+    // Start count scoped to Dairy
+    await store.startCount(category: 'Dairy');
+    expect(store.count?['scope'], 'Dairy');
+    expect((store.count?['baseline'] as Map).containsKey('p_milk'), isTrue);
+    expect((store.count?['baseline'] as Map).containsKey('p_bread'), isFalse);
+
+    // Selling Dairy is blocked
+    await expectLater(store.checkout({'p_milk': 1}, 'Sale'), throwsStateError);
+
+    // Selling Bakery (uncounted item) is permitted!
+    final ref = await store.checkout({'p_bread': 2}, 'Bread sale');
+    expect(ref, isNotEmpty);
+    expect(store.stock(bakery), 3);
+
+    // Finish count for milk
+    await store.setCount('p_milk', 8);
+    await store.postCount();
+    expect(store.stock(dairy), 8);
+    expect(store.count, isNull);
+    expect(store.received.last['kind'], 'Posted count (Dairy)');
+  });
+
+  test('previewMerge computes before and after stock balance impact before merging', () async {
+    final coffee = item(id: 'p_coffee', name: 'Coffee', opening: 20);
+    await store.saveProduct(coffee);
+
+    // Create a received Day record with sales of Coffee (-3) and a new product
+    final dayRecord = {
+      'format': 'stockmix',
+      'version': 1,
+      'id': 'rec_day_1',
+      'kind': 'Day record',
+      'shop': 'Branch B',
+      'currency': store.currency,
+      'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      'products': [
+        {
+          'id': 'p_coffee',
+          'name': 'Coffee',
+          'category': 'Pantry',
+          'barcode': '1234567890123',
+          'price': 450,
+          'cost': 200,
+          'opening': 20,
+          'onHand': 17,
+          'threshold': 3,
+          'unit': 'pcs',
+        },
+        {
+          'id': 'p_tea',
+          'name': 'Green Tea',
+          'category': 'Pantry',
+          'barcode': '999999',
+          'price': 300,
+          'cost': 150,
+          'opening': 15,
+          'onHand': 15,
+          'threshold': 2,
+          'unit': 'pcs',
+        }
+      ],
+      'movements': [
+        {
+          'id': 'm_coffee_sale',
+          'productId': 'p_coffee',
+          'name': 'Coffee',
+          'type': 'Sale',
+          'delta': -3,
+          'price': 450,
+          'cost': 200,
+          'note': 'Customer sale',
+          'reference': 'ref_1',
+          'at': DateTime.now().toUtc().toIso8601String(),
+        }
+      ],
+    };
+
+    await store.importBundle(dayRecord);
+
+    // Preview merge
+    final preview = store.previewMerge('rec_day_1');
+    final changes = preview['stockChanges'] as List<Map<String, dynamic>>;
+
+    // Coffee should show: 20 -> 17 (-3)
+    final coffeePreview = changes.firstWhere((c) => c['productId'] == 'p_coffee');
+    expect(coffeePreview['currentStock'], 20);
+    expect(coffeePreview['newStock'], 17);
+    expect(coffeePreview['delta'], -3);
+    expect(coffeePreview['isNew'], isFalse);
+
+    // Tea should show: 0 -> 15 (+15, New)
+    final teaPreview = changes.firstWhere((c) => c['productId'] == 'p_tea');
+    expect(teaPreview['currentStock'], 0);
+    expect(teaPreview['newStock'], 15);
+    expect(teaPreview['delta'], 15);
+    expect(teaPreview['isNew'], isTrue);
+
+    expect(preview['newProductsCount'], 1);
+    expect(preview['newMovementsCount'], 1);
+
+    // Apply merge and verify resulting stock
+    await store.mergeReceived('rec_day_1');
+    expect(store.stock(coffee), 17);
+    final tea = store.product('p_tea');
+    expect(store.stock(tea), 15);
+  });
 }
