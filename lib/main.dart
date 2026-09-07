@@ -55,10 +55,19 @@ class StockmixApp extends StatelessWidget {
   final StockStore store;
   const StockmixApp({super.key, required this.store});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    title: 'Stockmix',
-    theme: stockTheme(),
-    home: StockShell(store: store),
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: store,
+    builder: (context, _) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Stockmix',
+      theme: stockTheme(),
+      darkTheme: stockDarkTheme(),
+      themeMode: switch (store.themeMode) {
+        'dark' => ThemeMode.dark,
+        'system' => ThemeMode.system,
+        _ => ThemeMode.light,
+      },
+      home: StockShell(store: store),
+    ),
   );
 }

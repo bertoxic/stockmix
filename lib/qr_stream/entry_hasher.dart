@@ -8,13 +8,15 @@ class EntryHasher {
   /// Ignores ephemeral local IDs and photo byte strings so identical catalog items match.
   static String productHash(Product p) {
     final barcodeKey = normalizeCode(p.barcode);
-    final canonical = 'PROD|${p.name.trim().toLowerCase()}|$barcodeKey|${p.price}|${p.cost}|${p.threshold}|${p.unit.trim().toLowerCase()}';
+    final canonical =
+        'PROD|${p.name.trim().toLowerCase()}|$barcodeKey|${p.price}|${p.cost}|${p.threshold}|${p.unit.trim().toLowerCase()}|${p.packSize}|${p.packPrice}|${p.defaultSellingUnit}';
     return sha256.convert(utf8.encode(canonical)).toString();
   }
 
   /// Canonical hash for a Movement based on transaction facts.
   static String movementHash(Movement m) {
-    final canonical = 'MOVE|${m.productId}|${m.type}|${m.delta}|${m.price}|${m.cost}|${m.at}|${m.reference}';
+    final canonical =
+        'MOVE|${m.productId}|${m.type}|${m.delta}|${m.price}|${m.cost}|${m.at}|${m.reference}|${m.saleUnit}|${m.saleUnitMultiplier}|${m.saleQuantity}|${m.lineTotal}|${m.returnOf}';
     return sha256.convert(utf8.encode(canonical)).toString();
   }
 
@@ -112,9 +114,13 @@ class StreamImportAnalysis {
 
   int get totalMovements => movements.length;
   int get newMovementsCount => movements.where((m) => !m.isDuplicate).length;
-  int get duplicateMovementsCount => movements.where((m) => m.isDuplicate).length;
+  int get duplicateMovementsCount =>
+      movements.where((m) => m.isDuplicate).length;
 
-  bool get hasAnyDuplicates => duplicateProductsCount > 0 || duplicateMovementsCount > 0 || isBundleAlreadyReceived;
+  bool get hasAnyDuplicates =>
+      duplicateProductsCount > 0 ||
+      duplicateMovementsCount > 0 ||
+      isBundleAlreadyReceived;
 
   /// Perform analysis against the local store.
   factory StreamImportAnalysis.analyze(
@@ -125,7 +131,9 @@ class StreamImportAnalysis {
     final bundleKind = bundle['kind']?.toString() ?? 'Stock snapshot';
     final shopName = bundle['shop']?.toString() ?? 'Shared store';
     final currency = bundle['currency']?.toString() ?? store.currency;
-    final exportedAt = DateTime.tryParse(bundle['exportedAt']?.toString() ?? '') ?? DateTime.now();
+    final exportedAt =
+        DateTime.tryParse(bundle['exportedAt']?.toString() ?? '') ??
+        DateTime.now();
     final bundleHash = EntryHasher.canonicalJsonHash(bundle);
 
     final isBundleAlreadyReceived = store.received.any(
@@ -147,7 +155,9 @@ class StreamImportAnalysis {
       var reason = 'New product';
 
       // 1. Check ID
-      final idMatch = store.products.where((item) => item.id == p.id).firstOrNull;
+      final idMatch = store.products
+          .where((item) => item.id == p.id)
+          .firstOrNull;
       if (idMatch != null) {
         existingMatch = idMatch;
         isDup = true;
@@ -156,9 +166,13 @@ class StreamImportAnalysis {
 
       // 2. Check Barcode
       if (!isDup && p.barcode.isNotEmpty) {
-        final barcodeMatch = store.products.where(
-          (item) => item.barcode.isNotEmpty && normalizeCode(item.barcode) == normalizeCode(p.barcode),
-        ).firstOrNull;
+        final barcodeMatch = store.products
+            .where(
+              (item) =>
+                  item.barcode.isNotEmpty &&
+                  normalizeCode(item.barcode) == normalizeCode(p.barcode),
+            )
+            .firstOrNull;
         if (barcodeMatch != null) {
           existingMatch = barcodeMatch;
           isDup = true;
@@ -168,7 +182,9 @@ class StreamImportAnalysis {
 
       // 3. Check Content Hash (exact name, price, cost, unit)
       if (!isDup) {
-        final hashMatch = store.products.where((item) => EntryHasher.productHash(item) == hash).firstOrNull;
+        final hashMatch = store.products
+            .where((item) => EntryHasher.productHash(item) == hash)
+            .firstOrNull;
         if (hashMatch != null) {
           existingMatch = hashMatch;
           isDup = true;

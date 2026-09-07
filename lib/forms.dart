@@ -49,19 +49,21 @@ class _PhotoInputState extends State<PhotoInput> {
     child: Column(
       children: [
         if (widget.value != null) ...[
-          Builder(builder: (_) {
-            final bytes = ProductImage.decodeBytes(widget.value);
-            if (bytes == null) return const SizedBox.shrink();
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.memory(
-                bytes,
-                height: 130,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            );
-          }),
+          Builder(
+            builder: (_) {
+              final bytes = ProductImage.decodeBytes(widget.value);
+              if (bytes == null) return const SizedBox.shrink();
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.memory(
+                  bytes,
+                  height: 130,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 10),
         ],
         Row(
@@ -70,7 +72,7 @@ class _PhotoInputState extends State<PhotoInput> {
               widget.value == null
                   ? Icons.add_photo_alternate_outlined
                   : Icons.check_circle_outline,
-              color: muted,
+              color: context.stockMuted,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -106,9 +108,9 @@ class _PhotoInputState extends State<PhotoInput> {
               ),
             ],
           ),
-        const Text(
+        Text(
           'Photos are resized and compressed before saving.',
-          style: TextStyle(fontSize: 11, color: muted),
+          style: TextStyle(fontSize: 11, color: context.stockMuted),
         ),
       ],
     ),
@@ -138,9 +140,13 @@ class _ProductFormState extends State<ProductForm> {
       threshold,
       code,
       category,
-      unit;
+      unit,
+      packSize,
+      packPrice;
   String? photo;
   bool saving = false;
+  bool sellsByPack = false;
+  String defaultSellingUnit = 'base';
   List<String> nameSuggestions = [];
   @override
   void initState() {
@@ -158,6 +164,14 @@ class _ProductFormState extends State<ProductForm> {
     code = TextEditingController(text: p?.barcode ?? widget.barcode);
     category = TextEditingController(text: p?.category ?? 'General');
     unit = TextEditingController(text: p?.unit ?? 'pcs');
+    packSize = TextEditingController(text: '${p?.packSize ?? 10}');
+    packPrice = TextEditingController(
+      text: p?.packPrice == null
+          ? ''
+          : (p!.packPrice! / 100).toStringAsFixed(2),
+    );
+    sellsByPack = p?.sellsByPack ?? false;
+    defaultSellingUnit = p?.defaultSellingUnit ?? 'base';
     photo = p?.photo;
   }
 
@@ -172,6 +186,8 @@ class _ProductFormState extends State<ProductForm> {
       code,
       category,
       unit,
+      packSize,
+      packPrice,
     ]) {
       c.dispose();
     }
@@ -211,6 +227,9 @@ class _ProductFormState extends State<ProductForm> {
           threshold: int.parse(threshold.text),
           unit: unit.text.trim().isEmpty ? 'pcs' : unit.text.trim(),
           photo: photo,
+          packSize: sellsByPack ? int.parse(packSize.text) : 1,
+          packPrice: sellsByPack ? parseMoney(packPrice.text) : null,
+          defaultSellingUnit: sellsByPack ? defaultSellingUnit : 'base',
         ),
       );
       if (mounted) {
@@ -249,9 +268,9 @@ class _ProductFormState extends State<ProductForm> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'A clear name, a price, and you’re ready to go.',
-                style: TextStyle(color: muted),
+                style: TextStyle(color: context.stockMuted),
               ),
               const SizedBox(height: 24),
               PhotoInput(
@@ -285,20 +304,20 @@ class _ProductFormState extends State<ProductForm> {
                   children: [
                     const Icon(Icons.auto_awesome, size: 14, color: avocado),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       'Detected from photo (tap to use):',
                       style: TextStyle(
                         fontSize: 11,
-                        color: muted,
+                        color: context.stockMuted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
                     InkWell(
                       onTap: () => setState(() => nameSuggestions.clear()),
-                      child: const Text(
+                      child: Text(
                         'Dismiss',
-                        style: TextStyle(fontSize: 11, color: muted),
+                        style: TextStyle(fontSize: 11, color: context.stockMuted),
                       ),
                     ),
                   ],
@@ -408,6 +427,83 @@ class _ProductFormState extends State<ProductForm> {
                 ],
               ),
               const SizedBox(height: 14),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Sell this item by pack too'),
+                subtitle: Text(
+                  sellsByPack
+                      ? 'Stock stays in ${unit.text.trim().isEmpty ? 'base units' : unit.text.trim()}; a pack deducts several at once.'
+                      : 'Turn on for medicines sold as both a loose unit and a pack.',
+                  style: TextStyle(fontSize: 11, color: context.stockMuted),
+                ),
+                value: sellsByPack,
+                onChanged: (value) => setState(() {
+                  sellsByPack = value;
+                  if (!value) defaultSellingUnit = 'base';
+                }),
+              ),
+              if (sellsByPack) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: packSize,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText:
+                              '${unit.text.trim().isEmpty ? 'Base units' : unit.text.trim()} per Pack',
+                        ),
+                        validator: (value) {
+                          final parsed = int.tryParse(value ?? '');
+                          if (parsed == null ||
+                              parsed < 2 ||
+                              parsed > 1000000) {
+                            return 'Enter 2–1,000,000';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: packPrice,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Pack price (${widget.store.currency})',
+                        ),
+                        validator: money,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SegmentedButton<String>(
+                  segments: [
+                    ButtonSegment(
+                      value: 'base',
+                      label: Text(
+                        unit.text.trim().isEmpty
+                            ? 'Base unit'
+                            : unit.text.trim(),
+                      ),
+                    ),
+                    const ButtonSegment(value: 'pack', label: Text('Pack')),
+                  ],
+                  selected: {defaultSellingUnit},
+                  onSelectionChanged: (selection) =>
+                      setState(() => defaultSellingUnit = selection.first),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'This is preselected after scanning; staff can change it before adding.',
+                  style: TextStyle(fontSize: 11, color: context.stockMuted),
+                ),
+              ],
+              const SizedBox(height: 14),
               TextFormField(
                 controller: threshold,
                 keyboardType: TextInputType.number,
@@ -451,6 +547,21 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
   String reason = 'Damage';
   String? photo;
   bool add = false, saving = false;
+  String adjustmentUnit = 'base';
+
+  bool get canChoosePack => widget.product.sellsByPack;
+  bool get addingStock => widget.receiving || add;
+  int get unitMultiplier =>
+      adjustmentUnit == 'pack' ? widget.product.packSize : 1;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.receiving && widget.product.defaultSellingUnit == 'pack') {
+      adjustmentUnit = 'pack';
+    }
+  }
+
   @override
   void dispose() {
     quantity.dispose();
@@ -460,7 +571,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
 
   Future<void> save() async {
     final qty = int.tryParse(quantity.text);
-    if (qty == null || qty <= 0 || qty > 100000000) {
+    if (qty == null || qty <= 0 || qty * unitMultiplier > 100000000) {
       showMessage(context, 'Enter a positive whole quantity.');
       return;
     }
@@ -472,7 +583,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
     try {
       await widget.store.adjust(
         widget.product,
-        widget.receiving || add ? qty : -qty,
+        addingStock ? qty * unitMultiplier : -qty * unitMultiplier,
         widget.receiving ? 'Received' : reason,
         note.text,
         photo: photo,
@@ -514,8 +625,8 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          '${widget.store.stock(widget.product)} ${widget.product.unit} on hand',
-                          style: const TextStyle(color: muted),
+                          '${widget.store.stockLabel(widget.product)} on hand',
+                          style: TextStyle(color: context.stockMuted),
                         ),
                       ],
                     ),
@@ -559,10 +670,35 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               ),
               const SizedBox(height: 20),
             ],
+            if (canChoosePack) ...[
+              const SizedBox(height: 20),
+              SegmentedButton<String>(
+                segments: [
+                  ButtonSegment(
+                    value: 'base',
+                    label: Text(widget.product.unit),
+                  ),
+                  const ButtonSegment(value: 'pack', label: Text('Pack')),
+                ],
+                selected: {adjustmentUnit},
+                onSelectionChanged: (selection) =>
+                    setState(() => adjustmentUnit = selection.first),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                adjustmentUnit == 'pack'
+                    ? '1 Pack = ${widget.product.packSize} ${widget.product.unit}. Stock will be saved in ${widget.product.unit}.'
+                    : 'Stock will be saved in ${widget.product.unit}.',
+                style: TextStyle(fontSize: 11, color: context.stockMuted),
+              ),
+            ],
             TextField(
               controller: quantity,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Quantity'),
+              decoration: InputDecoration(
+                labelText:
+                    'Quantity (${adjustmentUnit == 'pack' ? 'Packs' : widget.product.unit})',
+              ),
             ),
             const SizedBox(height: 20),
             TextField(

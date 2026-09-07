@@ -201,7 +201,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         ),
                         Text(
                           'Stream A (Seq #${frame!.sequence + 1})',
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: muted),
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 4, horizontal: 16),
@@ -219,7 +219,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         ),
                         Text(
                           'Stream B (Seq #${secondFrame!.sequence + 1})',
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: muted),
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
                         ),
                       ],
                     ),
@@ -262,7 +262,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                             const SizedBox(height: 2),
                             Text(
                               'Stream A (#${frame!.sequence + 1})',
-                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: muted),
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
                             ),
                           ],
                         ),
@@ -289,7 +289,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                             const SizedBox(height: 2),
                             Text(
                               'Stream B (#${secondFrame!.sequence + 1})',
-                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: muted),
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
                             ),
                           ],
                         ),
@@ -334,7 +334,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: linen,
+                    color: context.stockLinen,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -370,7 +370,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Payload size', style: TextStyle(fontSize: 12, color: muted)),
+                        Text('Payload size', style: TextStyle(fontSize: 12, color: context.stockMuted)),
                         Text(
                           '${(preparedPayload.uncompressedLength / 1024).toStringAsFixed(1)} KB (${preparedPayload.compressedData.length} bytes compressed)',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -381,7 +381,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Session ID', style: TextStyle(fontSize: 12, color: muted)),
+                        Text('Session ID', style: TextStyle(fontSize: 12, color: context.stockMuted)),
                         Text(
                           preparedPayload.sessionId,
                           style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
@@ -392,7 +392,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Integrity Hash', style: TextStyle(fontSize: 12, color: muted)),
+                        Text('Integrity Hash', style: TextStyle(fontSize: 12, color: context.stockMuted)),
                         Text(
                           EntryHasher.shortHash(preparedPayload.fullSha256),
                           style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
@@ -425,7 +425,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                             includePhotos
                                 ? 'Photos included (${preparedPayload.totalBlocks} blocks). May take longer to scan.'
                                 : 'Off for maximum speed (${preparedPayload.totalBlocks} blocks). Fast and light.',
-                            style: const TextStyle(fontSize: 11, color: muted),
+                            style: TextStyle(fontSize: 11, color: context.stockMuted),
                           ),
                         ],
                       ),
@@ -457,9 +457,9 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Emit multiple blocks simultaneously to multiply camera ingestion speed.',
-                      style: TextStyle(fontSize: 11, color: muted),
+                      style: TextStyle(fontSize: 11, color: context.stockMuted),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -468,7 +468,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                       children: QrDisplayMode.values.map((mode) {
                         final isSelected = displayMode == mode;
                         return ChoiceChip(
-                          avatar: Icon(mode.icon, size: 16, color: isSelected ? Colors.white : plum),
+                          avatar: Icon(mode.icon, size: 16, color: isSelected ? Colors.white : context.stockInk),
                           label: Text(
                             mode.label,
                             style: TextStyle(

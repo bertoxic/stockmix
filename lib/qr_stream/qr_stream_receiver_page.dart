@@ -180,7 +180,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                           errorBuilder: (_, err) => Container(
                             color: plum,
                             padding: const EdgeInsets.all(20),
-                            child: const Center(
+                            child: Center(
                               child: Text(
                                 'Camera unavailable. Grant camera permission in settings.',
                                 textAlign: TextAlign.center,
@@ -192,7 +192,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                       else
                         Container(
                           color: plum,
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'Camera scanning is not supported on this platform.',
                               style: TextStyle(color: paper),
@@ -231,12 +231,12 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                         color: Colors.red.shade50,
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline, color: rust),
+                            Icon(Icons.error_outline, color: context.stockRust),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 errorMessage!,
-                                style: const TextStyle(color: rust, fontSize: 12),
+                                style: TextStyle(color: context.stockRust, fontSize: 12),
                               ),
                             ),
                             TextButton(
@@ -271,7 +271,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: stats.isComplete ? avocado : linen,
+                            color: stats.isComplete ? avocado : context.stockLinen,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -324,12 +324,12 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                             ),
                             child: Center(
                               child: resolved
-                                  ? const Icon(Icons.check, size: 12, color: plum)
+                                  ? Icon(Icons.check, size: 12, color: context.stockInk)
                                   : Text(
                                       '${index + 1}',
                                       style: TextStyle(
                                         fontSize: 8,
-                                        color: muted.withValues(alpha: 0.7),
+                                        color: context.stockMuted.withValues(alpha: 0.7),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -368,7 +368,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
     children: [
       Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
       const SizedBox(height: 2),
-      Text(label, style: const TextStyle(fontSize: 10, color: muted)),
+      Text(label, style: TextStyle(fontSize: 10, color: context.stockMuted)),
     ],
   );
 }

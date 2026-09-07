@@ -111,7 +111,7 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: paper,
+                            color: context.stockPaper,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: cement),
                           ),
@@ -129,7 +129,7 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                       children: [
                         Text(
                           'Streamed at ${DateFormat('d MMM yyyy · h:mm a').format(analysis.exportedAt.toLocal())}',
-                          style: const TextStyle(fontSize: 12, color: muted),
+                          style: TextStyle(fontSize: 12, color: context.stockMuted),
                         ),
                         if (durationString != null)
                           Container(
@@ -141,11 +141,11 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.timer_outlined, size: 13, color: plum),
+                                Icon(Icons.timer_outlined, size: 13, color: context.stockInk),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Time taken: $durationString',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: plum),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.stockInk),
                                 ),
                               ],
                             ),
@@ -155,7 +155,7 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                     const SizedBox(height: 6),
                     Text(
                       'SHA-256: ${widget.verifiedSha256}',
-                      style: const TextStyle(fontSize: 10, color: muted, fontFamily: 'monospace'),
+                      style: TextStyle(fontSize: 10, color: context.stockMuted, fontFamily: 'monospace'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -191,9 +191,9 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'Safe to import without duplicate risk',
-                            style: TextStyle(fontSize: 11, color: muted),
+                            style: TextStyle(fontSize: 11, color: context.stockMuted),
                           ),
                         ],
                       ),
@@ -206,9 +206,9 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.copy_all_outlined, size: 18, color: rust),
+                              Icon(Icons.copy_all_outlined, size: 18, color: context.stockRust),
                               SizedBox(width: 6),
                               Expanded(
                                 child: Text('Duplicates detected', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
@@ -220,12 +220,12 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                             isStockSnapshot
                                 ? '${analysis.duplicateProductsCount} duplicate items'
                                 : '${analysis.duplicateMovementsCount} duplicate records',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: rust),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.stockRust),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'Will be safely skipped to protect inventory',
-                            style: TextStyle(fontSize: 11, color: muted),
+                            style: TextStyle(fontSize: 11, color: context.stockMuted),
                           ),
                         ],
                       ),
@@ -240,12 +240,12 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                   color: Colors.amber.shade50,
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, color: rust),
+                      Icon(Icons.warning_amber_rounded, color: context.stockRust),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Store currency mismatch (${widget.store.currency} vs ${analysis.currency}). Product inventory cannot be directly imported.',
-                          style: const TextStyle(fontSize: 12, color: rust),
+                          style: TextStyle(fontSize: 12, color: context.stockRust),
                         ),
                       ),
                     ],
@@ -257,14 +257,14 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                 const SizedBox(height: 14),
                 Surface(
                   color: linen,
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 18, color: muted),
+                      Icon(Icons.info_outline, size: 18, color: context.stockMuted),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Note: An identical snapshot or record has already been saved in Received Records.',
-                          style: TextStyle(fontSize: 12, color: muted),
+                          style: TextStyle(fontSize: 12, color: context.stockMuted),
                         ),
                       ),
                     ],
@@ -304,12 +304,12 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                                 const SizedBox(height: 6),
                                 Text(
                                   '${item.onHand} ${item.product.unit} · ${widget.store.currency} ${(item.product.price / 100).toStringAsFixed(2)} · Barcode: ${item.product.barcode.isEmpty ? "None" : item.product.barcode}',
-                                  style: const TextStyle(fontSize: 12, color: muted),
+                                  style: TextStyle(fontSize: 12, color: context.stockMuted),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Hash: ${EntryHasher.shortHash(item.contentHash)}',
-                                  style: const TextStyle(fontSize: 10, color: muted, fontFamily: 'monospace'),
+                                  style: TextStyle(fontSize: 10, color: context.stockMuted, fontFamily: 'monospace'),
                                 ),
                               ],
                             ),
@@ -340,7 +340,7 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                           const SizedBox(height: 6),
                           Text(
                             '${item.movement.type} · ${item.movement.delta} units · ${widget.store.currency} ${(item.movement.price / 100).toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 12, color: muted),
+                            style: TextStyle(fontSize: 12, color: context.stockMuted),
                           ),
                           if (item.movement.note.isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -349,7 +349,7 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
                           const SizedBox(height: 4),
                           Text(
                             'Ref: ${item.movement.reference} · Hash: ${EntryHasher.shortHash(item.contentHash)}',
-                            style: const TextStyle(fontSize: 10, color: muted, fontFamily: 'monospace'),
+                            style: TextStyle(fontSize: 10, color: context.stockMuted, fontFamily: 'monospace'),
                           ),
                         ],
                       ),
@@ -404,18 +404,18 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: linen,
+          color: context.stockLinen,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: cement),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.block, size: 12, color: rust),
+            Icon(Icons.block, size: 12, color: context.stockRust),
             const SizedBox(width: 4),
             Text(
               'Duplicate · $reason',
-              style: const TextStyle(fontSize: 10, color: rust, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 10, color: context.stockRust, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -427,14 +427,14 @@ class _StreamImportReviewPageState extends State<StreamImportReviewPage> {
           color: avocado.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check, size: 12, color: plum),
+            Icon(Icons.check, size: 12, color: context.stockInk),
             SizedBox(width: 4),
             Text(
               'New Entry',
-              style: TextStyle(fontSize: 10, color: plum, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 10, color: context.stockInk, fontWeight: FontWeight.w700),
             ),
           ],
         ),

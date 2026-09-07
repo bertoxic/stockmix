@@ -126,7 +126,7 @@ class _SharePageState extends State<SharePage> {
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
                     'File currency: ${data['currency']}. Product import is unavailable because your store uses ${widget.store.currency}.',
-                    style: const TextStyle(color: rust, fontSize: 12),
+                    style: TextStyle(color: context.stockRust, fontSize: 12),
                   ),
                 ),
             ],
@@ -273,8 +273,9 @@ class _SharePageState extends State<SharePage> {
               onPressed: working
                   ? null
                   : () {
-                      final bundle =
-                          widget.store.bundle(day: daily ? day : null);
+                      final bundle = widget.store.bundle(
+                        day: daily ? day : null,
+                      );
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -298,7 +299,9 @@ class _SharePageState extends State<SharePage> {
                         export(true, box.localToGlobal(Offset.zero) & box.size);
                       },
                 icon: const Icon(Icons.ios_share_outlined, size: 20),
-                label: Text(working ? 'Preparing…' : 'Share file with another user'),
+                label: Text(
+                  working ? 'Preparing…' : 'Share file with another user',
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -308,7 +311,7 @@ class _SharePageState extends State<SharePage> {
               label: const Text('Save as a file'),
             ),
             const SizedBox(height: 22),
-            const Surface(
+            Surface(
               color: linen,
               padding: EdgeInsets.zero,
               child: Column(
@@ -316,7 +319,7 @@ class _SharePageState extends State<SharePage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.qr_code_scanner, size: 18, color: plum),
+                      Icon(Icons.qr_code_scanner, size: 18, color: context.stockInk),
                       SizedBox(width: 8),
                       Text(
                         '100% Offline Stream Transfer',
@@ -330,7 +333,7 @@ class _SharePageState extends State<SharePage> {
                   SizedBox(height: 10),
                   Text(
                     'Animated QR streams transfer stock data camera-to-screen with no Wi-Fi, Bluetooth, or Internet required. Fountain coding ensures missing frames reconstruct automatically with duplicate-safe hashcodes.',
-                    style: TextStyle(fontSize: 12, color: muted, height: 1.6),
+                    style: TextStyle(fontSize: 12, color: context.stockMuted, height: 1.6),
                   ),
                 ],
               ),
@@ -347,12 +350,12 @@ class _SharePageState extends State<SharePage> {
               onPressed: working
                   ? null
                   : () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              QrStreamReceiverPage(store: widget.store),
-                        ),
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            QrStreamReceiverPage(store: widget.store),
                       ),
+                    ),
               icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
               label: const Text('Scan incoming QR stream'),
             ),
@@ -367,11 +370,11 @@ class _SharePageState extends State<SharePage> {
               onPressed: working
                   ? null
                   : () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BackupRestorePage(store: widget.store),
-                        ),
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BackupRestorePage(store: widget.store),
                       ),
+                    ),
               icon: const Icon(Icons.backup_outlined),
               label: Text(
                 widget.store.lastBackupAt == null
@@ -403,7 +406,7 @@ class _SharePageState extends State<SharePage> {
     IconData icon,
   ) => ListTile(
     onTap: working ? null : () => setState(() => format = value),
-    leading: Icon(icon, color: muted),
+    leading: Icon(icon, color: context.stockMuted),
     title: Text(
       title,
       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
@@ -412,14 +415,14 @@ class _SharePageState extends State<SharePage> {
       padding: const EdgeInsets.only(top: 6),
       child: Text(
         subtitle,
-        style: const TextStyle(color: muted, fontSize: 11, height: 1.5),
+        style: TextStyle(color: context.stockMuted, fontSize: 11, height: 1.5),
       ),
     ),
     trailing: Icon(
       format == value
           ? Icons.radio_button_checked
           : Icons.radio_button_unchecked,
-      color: format == value ? plum : cement,
+      color: format == value ? context.stockInk : cement,
     ),
   );
 }
@@ -449,7 +452,7 @@ class ReceivedPage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Material(
-                    color: paper,
+                    color: context.stockPaper,
                     borderRadius: BorderRadius.circular(20),
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(18),
@@ -465,16 +468,16 @@ class ReceivedPage extends StatelessWidget {
                         DateFormat(
                           'd MMM yyyy · h:mm a',
                         ).format(DateTime.parse(r['exportedAt']).toLocal()),
-                        style: const TextStyle(fontSize: 11, color: muted),
+                        style: TextStyle(fontSize: 11, color: context.stockMuted),
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             tooltip: 'Delete record',
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.delete_outline,
-                              color: muted,
+                              color: context.stockMuted,
                               size: 20,
                             ),
                             onPressed: () async {
@@ -527,19 +530,180 @@ class SharedRecordPage extends StatefulWidget {
   State<SharedRecordPage> createState() => _SharedRecordPageState();
 }
 
+enum _CurrencyMergeChoice { cancel, changeLabelOnly, useExchangeRate }
+
+class _ExchangeRateDialog extends StatefulWidget {
+  final String sourceCurrency;
+  final String targetCurrency;
+  const _ExchangeRateDialog({
+    required this.sourceCurrency,
+    required this.targetCurrency,
+  });
+
+  @override
+  State<_ExchangeRateDialog> createState() => _ExchangeRateDialogState();
+}
+
+class _ExchangeRateDialogState extends State<_ExchangeRateDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final parsed = double.tryParse(_controller.text.trim());
+    if (parsed == null || !parsed.isFinite || parsed <= 0) {
+      setState(() => _error = 'Enter a number greater than zero.');
+      return;
+    }
+    Navigator.pop(context, parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Row(
+      children: [
+        Icon(Icons.currency_exchange_outlined, color: context.stockInk),
+        SizedBox(width: 10),
+        Text('Set exchange rate'),
+      ],
+    ),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How many ${widget.targetCurrency} equal 1 ${widget.sourceCurrency}?',
+            style: TextStyle(fontSize: 13, color: context.stockMuted),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Your conversion rate',
+              prefixText: '1 ${widget.sourceCurrency} = ',
+              suffixText: widget.targetCurrency,
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Stock quantities will stay the same. We will convert item prices, costs, sales, and refunds before merging.',
+            style: TextStyle(fontSize: 11, color: context.stockMuted, height: 1.45),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: _submit,
+        child: const Text('Use this rate'),
+      ),
+    ],
+  );
+}
+
 class _SharedRecordPageState extends State<SharedRecordPage> {
   bool merging = false;
 
-  Future<void> _handleMerge() async {
+  Future<void> _startMergeFlow() async {
+    final store = widget.store;
+    if (store == null || merging) return;
+
+    if (store.count != null) {
+      showMessage(
+        context,
+        'Cannot merge: Finish the stock count before merging items.',
+      );
+      return;
+    }
+
+    final r = widget.record;
+    if (r['currency'] != store.currency) {
+      final choice = await showDialog<_CurrencyMergeChoice>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text(
+            'Choose how to merge currencies',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            'This record uses ${r['currency']}; your store uses ${store.currency}. Choose how amounts from this record should be added to your store.',
+            style: TextStyle(fontSize: 13, color: context.stockMuted, height: 1.45),
+          ),
+          actions: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, _CurrencyMergeChoice.cancel),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, _CurrencyMergeChoice.changeLabelOnly),
+                  child: const Text('Change label only'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, _CurrencyMergeChoice.useExchangeRate),
+                  child: const Text('Use my exchange rate'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      if (choice == null || choice == _CurrencyMergeChoice.cancel) return;
+      if (choice == _CurrencyMergeChoice.changeLabelOnly) {
+        await _handleMerge(exchangeRate: 1.0, isLabelOnly: true);
+        return;
+      }
+      if (choice == _CurrencyMergeChoice.useExchangeRate) {
+        await _promptForExchangeRate();
+        return;
+      }
+    } else {
+      await _handleMerge();
+    }
+  }
+
+  Future<void> _handleMerge({
+    double? exchangeRate,
+    bool isLabelOnly = false,
+  }) async {
     final store = widget.store;
     if (store == null || merging) return;
 
     final r = widget.record;
-    if (r['currency'] != store.currency) {
-      showMessage(
-        context,
-        'Cannot merge: File currency (${r['currency']}) differs from your store (${store.currency}).',
-      );
+    if (r['currency'] != store.currency && exchangeRate == null) {
+      await _startMergeFlow();
       return;
     }
     if (store.count != null) {
@@ -552,14 +716,16 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
 
     Map<String, dynamic> preview;
     try {
-      preview = store.previewMerge(r['id']);
+      preview = store.previewMerge(r['id'], exchangeRate: exchangeRate);
     } catch (e) {
       showMessage(context, friendlyError(e));
       return;
     }
 
     final stockChanges =
-        (preview['stockChanges'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+        (preview['stockChanges'] as List<dynamic>?)
+            ?.cast<Map<String, dynamic>>() ??
+        [];
     final newProductsCount = preview['newProductsCount'] as int? ?? 0;
     final newMovementsCount = preview['newMovementsCount'] as int? ?? 0;
     final backfilledPhotosCount = preview['backfilledPhotosCount'] as int? ?? 0;
@@ -586,8 +752,30 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                   isDayRecord
                       ? 'Review incoming day movements and see how your on-hand stock balances will adjust:'
                       : 'Review new products and quantities to be imported into your store:',
-                  style: const TextStyle(fontSize: 13, color: muted, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.stockMuted,
+                    height: 1.4,
+                  ),
                 ),
+                if (exchangeRate != null &&
+                    r['currency'] != store.currency) ...[
+                  const SizedBox(height: 12),
+                  Surface(
+                    color: linen,
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      isLabelOnly
+                          ? 'Amounts will be kept as-is and labeled in ${store.currency} without currency conversion (label change only). Stock quantities stay the same.'
+                          : 'Using your rate: 1 ${r['currency']} = ${exchangeRate.toStringAsFixed(4)} ${store.currency}. All monetary values will be converted; stock quantities stay the same.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.stockMuted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 if (stockChanges.isEmpty)
                   Surface(
@@ -595,7 +783,11 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                     padding: const EdgeInsets.all(12),
                     child: const Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: avocado, size: 20),
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: avocado,
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -613,7 +805,10 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                   ),
                   const SizedBox(height: 8),
                   Surface(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     child: Column(
                       children: [
                         for (final sc in stockChanges)
@@ -623,7 +818,8 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -640,13 +836,17 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                                           if (sc['isNew'] == true) ...[
                                             const SizedBox(width: 6),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 1,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 1,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: avocado.withValues(alpha: .3),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: avocado.withValues(
+                                                  alpha: .3,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: const Text(
                                                 'New item',
@@ -678,8 +878,8 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: (sc['delta'] as int) < 0
-                                            ? rust
-                                            : const Color(0xFF62643B),
+                                            ? context.stockRust
+                                            : context.stockPositive,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -702,7 +902,10 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                     if (newMovementsCount > 0)
                       Tag('+$newMovementsCount movements', color: paper),
                     if (backfilledPhotosCount > 0)
-                      Tag('+$backfilledPhotosCount photos backfilled', color: paper),
+                      Tag(
+                        '+$backfilledPhotosCount photos backfilled',
+                        color: paper,
+                      ),
                   ],
                 ),
               ],
@@ -725,7 +928,10 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
 
     setState(() => merging = true);
     try {
-      final res = await store.mergeReceived(r['id']);
+      final res = await store.mergeReceived(
+        r['id'],
+        exchangeRate: exchangeRate,
+      );
       if (mounted) {
         final newP = res['newProducts'] ?? 0;
         final backP = res['backfilledPhotos'] ?? 0;
@@ -733,20 +939,50 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
         final skippedP = res['skippedProducts'] ?? 0;
 
         final parts = <String>[];
-        if (newP > 0) parts.add('$newP new product${newP == 1 ? '' : 's'} added');
-        if (backP > 0) parts.add('$backP photo${backP == 1 ? '' : 's'} updated');
-        if (newM > 0) parts.add('$newM movement${newM == 1 ? '' : 's'} recorded');
-        if (skippedP > 0) parts.add('$skippedP existing item${skippedP == 1 ? '' : 's'} stock unchanged');
+        if (newP > 0) {
+          parts.add('$newP new product${newP == 1 ? '' : 's'} added');
+        }
+        if (backP > 0) {
+          parts.add('$backP photo${backP == 1 ? '' : 's'} updated');
+        }
+        if (newM > 0) {
+          parts.add('$newM movement${newM == 1 ? '' : 's'} recorded');
+        }
+        if (skippedP > 0) {
+          parts.add(
+            '$skippedP existing item${skippedP == 1 ? '' : 's'} stock unchanged',
+          );
+        }
 
         showMessage(
           context,
-          parts.isEmpty ? 'Inventory is already up to date.' : 'Merged: ${parts.join(', ')}.',
+          parts.isEmpty
+              ? 'Inventory is already up to date.'
+              : 'Merged: ${parts.join(', ')}.',
         );
       }
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => merging = false);
+    }
+  }
+
+  Future<void> _promptForExchangeRate() async {
+    final store = widget.store;
+    if (store == null || merging) return;
+    final r = widget.record;
+    final sourceCurrency = r['currency'] as String? ?? 'record currency';
+
+    final rate = await showDialog<double>(
+      context: context,
+      builder: (ctx) => _ExchangeRateDialog(
+        sourceCurrency: sourceCurrency,
+        targetCurrency: store.currency,
+      ),
+    );
+    if (rate != null && mounted) {
+      await _handleMerge(exchangeRate: rate);
     }
   }
 
@@ -802,7 +1038,7 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                 DateFormat(
                   'd MMM yyyy · h:mm a',
                 ).format(DateTime.parse(r['exportedAt']).toLocal()),
-                style: const TextStyle(color: muted),
+                style: TextStyle(color: context.stockMuted),
               ),
               const SizedBox(height: 25),
               if (r['kind'] == 'Posted count') ...[
@@ -855,8 +1091,8 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                                   const SizedBox(height: 6),
                                   Text(
                                     '${raw['onHand']} ${p.unit} · ${price(p.price)}',
-                                    style: const TextStyle(
-                                      color: muted,
+                                    style: TextStyle(
+                                      color: context.stockMuted,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -885,8 +1121,8 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                             const SizedBox(height: 7),
                             Text(
                               '${m['type']} · ${m['delta']} units · ${price(m['price'])} each',
-                              style: const TextStyle(
-                                color: muted,
+                              style: TextStyle(
+                                color: context.stockMuted,
                                 fontSize: 12,
                               ),
                             ),
@@ -912,30 +1148,29 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                 const SizedBox(height: 28),
                 const Divider(),
                 const SizedBox(height: 18),
-                if (r['currency'] != store.currency)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Text(
-                      'Record currency (${r['currency']}) differs from your store (${store.currency}). Merging is unavailable.',
-                      style: const TextStyle(color: rust, fontSize: 12),
-                    ),
-                  )
-                else if (['Stock snapshot', 'Day record'].contains(r['kind'])) ...[
+                if (['Stock snapshot', 'Day record'].contains(r['kind'])) ...[
                   FilledButton.icon(
-                    onPressed: merging ? null : _handleMerge,
+                    onPressed: merging ? null : _startMergeFlow,
                     icon: merging
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.call_merge_rounded, size: 20),
-                    label: Text(merging ? 'Merging into inventory…' : 'Merge into store stock'),
+                    label: Text(
+                      merging
+                          ? 'Merging into inventory…'
+                          : 'Merge into store stock',
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Imports new products and day movements. Shows a stock balance preview before changes are applied.',
-                    style: TextStyle(fontSize: 11, color: muted, height: 1.4),
+                    style: TextStyle(fontSize: 11, color: context.stockMuted, height: 1.4),
                   ),
                   const SizedBox(height: 18),
                 ],
@@ -960,10 +1195,10 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                       }
                     }
                   },
-                  icon: const Icon(Icons.delete_outline, color: rust),
-                  label: const Text(
+                  icon: Icon(Icons.delete_outline, color: context.stockRust),
+                  label: Text(
                     'Delete this record',
-                    style: TextStyle(color: rust),
+                    style: TextStyle(color: context.stockRust),
                   ),
                 ),
                 const SizedBox(height: 12),

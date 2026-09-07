@@ -106,6 +106,93 @@ ThemeData stockTheme() => ThemeData(
   ),
 );
 
+// Dark surfaces use the same warm plum family and avocado accents. The light
+// theme and its palette above stay unchanged.
+const darkLinen = Color(0xFF211D21),
+    darkPaper = Color(0xFF2D272D),
+    darkMuted = Color(0xFFBBB3A7),
+    darkLine = Color(0xFF4D434B);
+
+extension StockPalette on BuildContext {
+  bool get isStockDark => Theme.of(this).brightness == Brightness.dark;
+  Color get stockPaper => isStockDark ? darkPaper : paper;
+  Color get stockLinen => isStockDark ? darkLinen : linen;
+  Color get stockInk => isStockDark ? linen : plum;
+  Color get stockMuted => isStockDark ? darkMuted : muted;
+  Color get stockLine => isStockDark ? darkLine : line;
+  Color get stockRust => isStockDark ? const Color(0xFFE99C82) : rust;
+  Color get stockPositive => isStockDark ? avocado : const Color(0xFF62643B);
+}
+
+ThemeData stockDarkTheme() {
+  final light = stockTheme();
+  final scheme = ColorScheme.fromSeed(
+    brightness: Brightness.dark,
+    seedColor: avocado,
+    primary: avocado,
+    onPrimary: plum,
+    secondary: maple,
+    onSecondary: plum,
+    surface: darkPaper,
+    onSurface: linen,
+    onSurfaceVariant: darkMuted,
+    outline: darkMuted,
+    outlineVariant: darkLine,
+    error: const Color(0xFFE99C82),
+  );
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: darkLinen,
+    colorScheme: scheme,
+    textTheme: light.textTheme
+        .apply(bodyColor: linen, displayColor: linen)
+        .copyWith(
+          bodySmall: light.textTheme.bodySmall?.copyWith(color: darkMuted),
+        ),
+    appBarTheme: light.appBarTheme.copyWith(
+      backgroundColor: darkLinen,
+      foregroundColor: linen,
+    ),
+    inputDecorationTheme: light.inputDecorationTheme.copyWith(
+      fillColor: darkPaper,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: darkLine),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: darkLine),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: avocado, width: 1.5),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: light.filledButtonTheme.style?.copyWith(
+        backgroundColor: const WidgetStatePropertyAll(avocado),
+        foregroundColor: const WidgetStatePropertyAll(plum),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: light.outlinedButtonTheme.style?.copyWith(
+        foregroundColor: const WidgetStatePropertyAll(linen),
+        side: const WidgetStatePropertyAll(BorderSide(color: darkLine)),
+      ),
+    ),
+    chipTheme: light.chipTheme.copyWith(
+      backgroundColor: darkPaper,
+      selectedColor: plum,
+      labelStyle: const TextStyle(color: linen),
+    ),
+    dividerTheme: light.dividerTheme.copyWith(color: darkLine),
+    snackBarTheme: light.snackBarTheme.copyWith(
+      contentTextStyle: const TextStyle(color: linen),
+    ),
+  );
+}
+
 class Surface extends StatelessWidget {
   final Widget child;
   final Color color;
@@ -117,11 +204,28 @@ class Surface extends StatelessWidget {
     this.padding = const EdgeInsets.all(20),
   });
   @override
-  Widget build(BuildContext context) => Material(
-    color: color,
-    borderRadius: BorderRadius.circular(24),
-    child: Padding(padding: padding, child: child),
-  );
+  Widget build(BuildContext context) {
+    final background = color == paper
+        ? context.stockPaper
+        : color == linen
+        ? context.stockLinen
+        : color;
+    Widget content = child;
+    if (context.isStockDark && (color == avocado || color == maple)) {
+      content = DefaultTextStyle.merge(
+        style: const TextStyle(color: plum),
+        child: IconTheme.merge(
+          data: const IconThemeData(color: plum),
+          child: content,
+        ),
+      );
+    }
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(padding: padding, child: content),
+    );
+  }
 }
 
 class Eyebrow extends StatelessWidget {
@@ -135,7 +239,7 @@ class Eyebrow extends StatelessWidget {
       fontSize: 10,
       fontWeight: FontWeight.w800,
       letterSpacing: 1.8,
-      color: color,
+      color: color == muted ? context.stockMuted : color,
     ),
   );
 }
@@ -153,7 +257,15 @@ class Tag extends StatelessWidget {
     ),
     child: Text(
       text,
-      style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 10),
+      style: TextStyle(
+        color: color == rust
+            ? context.stockRust
+            : color == const Color(0xFF62643B)
+            ? context.stockPositive
+            : color,
+        fontWeight: FontWeight.w700,
+        fontSize: 10,
+      ),
     ),
   );
 }
@@ -204,7 +316,7 @@ class ProductImage extends StatelessWidget {
         child: bytes == null
             ? Icon(
                 categoryIcon(product.category),
-                color: plum,
+                color: context.stockInk,
                 size: size * .43,
               )
             : Image.memory(
@@ -236,7 +348,10 @@ class EmptyState extends StatelessWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(color: linen, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: context.stockLinen,
+            shape: BoxShape.circle,
+          ),
           child: Icon(icon, size: 32, color: cement),
         ),
         const SizedBox(height: 18),
@@ -249,7 +364,7 @@ class EmptyState extends StatelessWidget {
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: muted, height: 1.5),
+          style: TextStyle(color: context.stockMuted, height: 1.5),
         ),
         if (action != null) ...[const SizedBox(height: 20), action!],
       ],
