@@ -4,11 +4,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
-import 'backup_page.dart';
 import 'design.dart';
 import 'stock_store.dart';
 import 'qr_stream/qr_stream_sender_page.dart';
 import 'qr_stream/qr_stream_receiver_page.dart';
+
+String senderLabel(Map<String, dynamic> record) {
+  final sender = (record['senderName'] as String?)?.trim();
+  final shop = record['shop']?.toString() ?? 'Shared store';
+  return sender == null || sender.isEmpty || sender == shop
+      ? shop
+      : '$sender · $shop';
+}
 
 class SharePage extends StatefulWidget {
   final StockStore store;
@@ -109,7 +116,7 @@ class _SharePageState extends State<SharePage> {
               Tag(data['kind']),
               const SizedBox(height: 15),
               Text(
-                'From ${data['shop']}',
+                'From ${senderLabel(data)}',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
@@ -319,7 +326,11 @@ class _SharePageState extends State<SharePage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.qr_code_scanner, size: 18, color: context.stockInk),
+                      Icon(
+                        Icons.qr_code_scanner,
+                        size: 18,
+                        color: context.stockInk,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         '100% Offline Stream Transfer',
@@ -333,7 +344,11 @@ class _SharePageState extends State<SharePage> {
                   SizedBox(height: 10),
                   Text(
                     'Animated QR streams transfer stock data camera-to-screen with no Wi-Fi, Bluetooth, or Internet required. Fountain coding ensures missing frames reconstruct automatically with duplicate-safe hashcodes.',
-                    style: TextStyle(fontSize: 12, color: context.stockMuted, height: 1.6),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.stockMuted,
+                      height: 1.6,
+                    ),
                   ),
                 ],
               ),
@@ -364,23 +379,6 @@ class _SharePageState extends State<SharePage> {
               onPressed: working ? null : importFile,
               icon: const Icon(Icons.file_open_outlined),
               label: const Text('Import a Stockmix file'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: working
-                  ? null
-                  : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BackupRestorePage(store: widget.store),
-                      ),
-                    ),
-              icon: const Icon(Icons.backup_outlined),
-              label: Text(
-                widget.store.lastBackupAt == null
-                    ? 'Full backup & restore (Not backed up)'
-                    : 'Full backup & restore',
-              ),
             ),
             const SizedBox(height: 12),
             TextButton(
@@ -427,96 +425,147 @@ class _SharePageState extends State<SharePage> {
   );
 }
 
-class ReceivedPage extends StatelessWidget {
+class ReceivedPage extends StatefulWidget {
   final StockStore store;
   const ReceivedPage({super.key, required this.store});
+
+  @override
+  State<ReceivedPage> createState() => _ReceivedPageState();
+}
+
+class _ReceivedPageState extends State<ReceivedPage> {
+  int filter = 0;
+
+  List<Map<String, dynamic>> get _filteredRecords {
+    final records = widget.store.received.reversed;
+    return records.where((record) {
+      if (filter == 1) return record['kind'] == 'Day record';
+      if (filter == 2) return record['kind'] != 'Day record';
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Received & saved records')),
+    appBar: AppBar(
+      title: const Text('Received & saved records'),
+      actions: [
+        PopupMenuButton<int>(
+          tooltip: 'Filter records',
+          icon: const Icon(Icons.filter_list_rounded),
+          initialValue: filter,
+          onSelected: (value) => setState(() => filter = value),
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 0, child: Text('All records')),
+            PopupMenuItem(value: 1, child: Text('Sales')),
+            PopupMenuItem(value: 2, child: Text('Stock')),
+          ],
+        ),
+        const SizedBox(width: 8),
+      ],
+    ),
     body: AnimatedBuilder(
-      animation: store,
-      builder: (context, _) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              if (store.received.isEmpty)
-                const EmptyState(
-                  icon: Icons.move_to_inbox_outlined,
-                  title: 'A place for shared records.',
-                  subtitle:
-                      'Import a Stockmix file or complete a stock count to see it here.',
-                ),
-              for (final r in store.received.reversed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Material(
-                    color: context.stockPaper,
-                    borderRadius: BorderRadius.circular(20),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(18),
-                      leading: const Icon(Icons.description_outlined),
-                      title: Text(
-                        '${r['kind']} · ${r['shop']}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+      animation: widget.store,
+      builder: (context, _) {
+        final records = _filteredRecords;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                if (records.isEmpty)
+                  EmptyState(
+                    icon: Icons.move_to_inbox_outlined,
+                    title: filter == 0
+                        ? 'A place for shared records.'
+                        : 'No records in this filter.',
+                    subtitle: filter == 0
+                        ? 'Import a Stockmix file or complete a stock count to see it here.'
+                        : 'Try another filter to see more saved records.',
+                  ),
+                for (final r in records)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Material(
+                      color: context.stockPaper,
+                      borderRadius: BorderRadius.circular(20),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(18),
+                        leading: Icon(
+                          r['kind'] == 'Day record'
+                              ? Icons.receipt_long_outlined
+                              : Icons.inventory_2_outlined,
+                          color: r['kind'] == 'Day record'
+                              ? avocado
+                              : context.stockMuted,
                         ),
-                      ),
-                      subtitle: Text(
-                        DateFormat(
-                          'd MMM yyyy · h:mm a',
-                        ).format(DateTime.parse(r['exportedAt']).toLocal()),
-                        style: TextStyle(fontSize: 11, color: context.stockMuted),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Delete record',
-                            icon: Icon(
-                              Icons.delete_outline,
-                              color: context.stockMuted,
-                              size: 20,
-                            ),
-                            onPressed: () async {
-                              if (await confirm(
-                                context,
-                                'Delete saved record?',
-                                'This removes "${r['kind']} from ${r['shop']}" from your saved records.',
-                                action: 'Delete',
-                              )) {
-                                try {
-                                  await store.deleteReceived(r['id']);
-                                  if (context.mounted) {
-                                    showMessage(context, 'Record removed.');
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    showMessage(context, friendlyError(e));
+                        title: Text(
+                          '${r['kind']} · ${senderLabel(r)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          DateFormat(
+                            'd MMM yyyy · h:mm a',
+                          ).format(DateTime.parse(r['exportedAt']).toLocal()),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: context.stockMuted,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Delete record',
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: context.stockMuted,
+                                size: 20,
+                              ),
+                              onPressed: () async {
+                                if (await confirm(
+                                  context,
+                                  'Delete saved record?',
+                                  'This removes "${r['kind']} from ${senderLabel(r)}" from your saved records.',
+                                  action: 'Delete',
+                                )) {
+                                  try {
+                                    await widget.store.deleteReceived(r['id']);
+                                    if (context.mounted) {
+                                      showMessage(context, 'Record removed.');
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      showMessage(context, friendlyError(e));
+                                    }
                                   }
                                 }
-                              }
-                            },
+                              },
+                            ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SharedRecordPage(
+                              record: r,
+                              store: widget.store,
+                            ),
                           ),
-                          const Icon(Icons.chevron_right),
-                        ],
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              SharedRecordPage(record: r, store: store),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     ),
   );
 }
@@ -528,6 +577,255 @@ class SharedRecordPage extends StatefulWidget {
 
   @override
   State<SharedRecordPage> createState() => _SharedRecordPageState();
+}
+
+class ReceivedDayActivityTile extends StatefulWidget {
+  final List<Map<String, dynamic>> movements;
+  final String currency;
+  const ReceivedDayActivityTile({
+    super.key,
+    required this.movements,
+    required this.currency,
+  });
+
+  @override
+  State<ReceivedDayActivityTile> createState() =>
+      _ReceivedDayActivityTileState();
+}
+
+class _ReceivedDayActivityTileState extends State<ReceivedDayActivityTile>
+    with TickerProviderStateMixin {
+  bool expanded = false;
+
+  bool get _isSale => widget.movements.first['type'] == 'Sale';
+  bool get _isReturn =>
+      widget.movements.first['type']?.toString().startsWith('Return') == true;
+
+  int _int(Map<String, dynamic> movement, String key) =>
+      movement[key] is int ? movement[key] as int : 0;
+
+  int get _saleTotal => widget.movements.fold<int>(
+    0,
+    (total, movement) =>
+        total +
+        (_int(movement, 'lineTotal') > 0
+            ? _int(movement, 'lineTotal')
+            : -_int(movement, 'delta') * _int(movement, 'price')),
+  );
+
+  int get _refundTotal => widget.movements
+      .where((movement) => movement['type'] == 'Return refund')
+      .fold<int>(0, (total, movement) => total + _int(movement, 'price'));
+
+  int get _units => widget.movements.fold<int>(
+    0,
+    (total, movement) => total + _int(movement, 'delta').abs(),
+  );
+
+  String _price(int cents) =>
+      '${widget.currency} ${(cents / 100).toStringAsFixed(2)}';
+
+  String get _time {
+    final raw = widget.movements.first['at']?.toString();
+    final value = raw == null ? null : DateTime.tryParse(raw)?.toLocal();
+    return value == null ? 'Unknown time' : DateFormat('h:mm a').format(value);
+  }
+
+  String get _title => widget.movements
+      .map((movement) => movement['name']?.toString() ?? 'Unnamed item')
+      .toSet()
+      .join(', ');
+
+  String get _subtitle {
+    if (_isSale) {
+      return 'Sale (${widget.movements.length} ${widget.movements.length == 1 ? 'item' : 'items'}) · $_time';
+    }
+    if (_isReturn) {
+      return 'Customer return (${widget.movements.length} ${widget.movements.length == 1 ? 'item' : 'items'}) · $_time';
+    }
+    return '${widget.movements.first['type']} · $_time';
+  }
+
+  Widget _photo(String value) {
+    try {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(
+            base64Decode(value),
+            height: 160,
+            width: double.infinity,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const Text('Photo unavailable'),
+          ),
+        ),
+      );
+    } catch (_) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 12),
+        child: Text('Photo unavailable'),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = _isSale
+        ? Icons.shopping_bag_outlined
+        : _isReturn
+        ? Icons.replay_outlined
+        : _int(widget.movements.first, 'delta') >= 0
+        ? Icons.south_west
+        : Icons.north_east;
+    final iconColor = _isReturn ? context.stockRust : context.stockInk;
+    final amount = _isSale
+        ? _price(_saleTotal)
+        : _isReturn && _refundTotal > 0
+        ? '-${_price(_refundTotal)}'
+        : '${_int(widget.movements.first, 'delta') >= 0 ? '+' : ''}${_int(widget.movements.first, 'delta')}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: context.stockPaper,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: () => setState(() => expanded = !expanded),
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color:
+                              (_isSale
+                                      ? avocado
+                                      : _isReturn
+                                      ? rust
+                                      : cement)
+                                  .withValues(alpha: .18),
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Icon(icon, size: 21, color: iconColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _title,
+                              maxLines: expanded ? null : 1,
+                              overflow: expanded ? null : TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              _subtitle,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: context.stockMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            amount,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: _isReturn ? context.stockRust : null,
+                            ),
+                          ),
+                          Text(
+                            '$_units ${_isSale
+                                ? 'sold'
+                                : _isReturn
+                                ? 'returned'
+                                : 'units'}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: context.stockMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Icon(
+                        expanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: context.stockMuted,
+                      ),
+                    ],
+                  ),
+                  if (expanded) ...[
+                    const Divider(height: 28),
+                    for (final movement in widget.movements) ...[
+                      Text(
+                        movement['name']?.toString() ?? 'Unnamed item',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${movement['type']} · ${_int(movement, 'delta') >= 0 ? '+' : ''}${_int(movement, 'delta')} units · ${_price(_int(movement, 'price'))} each',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.stockMuted,
+                        ),
+                      ),
+                      if ((movement['note']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          movement['note'].toString(),
+                          style: const TextStyle(fontSize: 12, height: 1.4),
+                        ),
+                      ],
+                      if (movement['photo'] is String)
+                        _photo(movement['photo'] as String),
+                      if ((movement['reference']?.toString() ?? '')
+                          .isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          'Reference: ${movement['reference']}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: context.stockMuted,
+                          ),
+                        ),
+                      ],
+                      if (movement != widget.movements.last)
+                        const Divider(height: 28),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 enum _CurrencyMergeChoice { cancel, changeLabelOnly, useExchangeRate }
@@ -592,9 +890,7 @@ class _ExchangeRateDialogState extends State<_ExchangeRateDialog> {
           TextField(
             controller: _controller,
             autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(
-              decimal: true,
-            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: 'Your conversion rate',
               prefixText: '1 ${widget.sourceCurrency} = ',
@@ -606,7 +902,11 @@ class _ExchangeRateDialogState extends State<_ExchangeRateDialog> {
           const SizedBox(height: 12),
           Text(
             'Stock quantities will stay the same. We will convert item prices, costs, sales, and refunds before merging.',
-            style: TextStyle(fontSize: 11, color: context.stockMuted, height: 1.45),
+            style: TextStyle(
+              fontSize: 11,
+              color: context.stockMuted,
+              height: 1.45,
+            ),
           ),
         ],
       ),
@@ -616,16 +916,60 @@ class _ExchangeRateDialogState extends State<_ExchangeRateDialog> {
         onPressed: () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(
-        onPressed: _submit,
-        child: const Text('Use this rate'),
-      ),
+      FilledButton(onPressed: _submit, child: const Text('Use this rate')),
     ],
   );
 }
 
 class _SharedRecordPageState extends State<SharedRecordPage> {
   bool merging = false;
+
+  List<List<Map<String, dynamic>>> _dayActivityGroups(List rawMovements) {
+    final movements = rawMovements
+        .map((movement) => Map<String, dynamic>.from(movement as Map))
+        .toList()
+        .reversed
+        .toList();
+    final groups = <List<Map<String, dynamic>>>[];
+    final processedReferences = <String>{};
+
+    for (final movement in movements) {
+      final type = movement['type']?.toString() ?? '';
+      final reference = movement['reference']?.toString() ?? '';
+      if (type == 'Sale' && reference.isNotEmpty) {
+        final key = 'sale:$reference';
+        if (processedReferences.add(key)) {
+          groups.add(
+            movements
+                .where(
+                  (other) =>
+                      other['type'] == 'Sale' &&
+                      other['reference'] == reference,
+                )
+                .toList(),
+          );
+        }
+      } else if (type.startsWith('Return') &&
+          reference.isNotEmpty &&
+          reference.startsWith('ret-')) {
+        final key = 'return:$reference';
+        if (processedReferences.add(key)) {
+          groups.add(
+            movements
+                .where(
+                  (other) =>
+                      other['type']?.toString().startsWith('Return') == true &&
+                      other['reference'] == reference,
+                )
+                .toList(),
+          );
+        }
+      } else {
+        groups.add([movement]);
+      }
+    }
+    return groups;
+  }
 
   Future<void> _startMergeFlow() async {
     final store = widget.store;
@@ -650,7 +994,11 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
           ),
           content: Text(
             'This record uses ${r['currency']}; your store uses ${store.currency}. Choose how amounts from this record should be added to your store.',
-            style: TextStyle(fontSize: 13, color: context.stockMuted, height: 1.45),
+            style: TextStyle(
+              fontSize: 13,
+              color: context.stockMuted,
+              height: 1.45,
+            ),
           ),
           actions: [
             Column(
@@ -992,6 +1340,10 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
     final store = widget.store;
     final products = r['products'] as List? ?? [];
     final movements = r['movements'] as List? ?? [];
+    final shopName = r['shop']?.toString() ?? 'Shared store';
+    final senderName = (r['senderName'] as String?)?.trim();
+    final showSenderName =
+        senderName != null && senderName.isNotEmpty && senderName != shopName;
     String price(int value) =>
         '${r['currency'] ?? ''} ${(value / 100).toStringAsFixed(2)}';
     return Scaffold(
@@ -1032,7 +1384,21 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
             children: [
               const Eyebrow('Saved copy'),
               const SizedBox(height: 12),
-              Text(r['shop'], style: Theme.of(context).textTheme.headlineLarge),
+              Text(
+                shopName,
+                style: Theme.of(context).textTheme.headlineLarge,
+              ),
+              if (showSenderName) ...[
+                const SizedBox(height: 4),
+                Text(
+                  senderName,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: context.stockMuted,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               Text(
                 DateFormat(
@@ -1104,6 +1470,16 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                       ),
                     );
                   })
+                else if (r['kind'] == 'Day record')
+                  ..._dayActivityGroups(movements).map(
+                    (group) => ReceivedDayActivityTile(
+                      key: ValueKey(
+                        '${group.first['reference'] ?? group.first['id']}:${group.first['type']}',
+                      ),
+                      movements: group,
+                      currency: r['currency']?.toString() ?? '',
+                    ),
+                  )
                 else
                   ...movements.map(
                     (m) => Padding(
@@ -1170,7 +1546,11 @@ class _SharedRecordPageState extends State<SharedRecordPage> {
                   const SizedBox(height: 8),
                   Text(
                     'Imports new products and day movements. Shows a stock balance preview before changes are applied.',
-                    style: TextStyle(fontSize: 11, color: context.stockMuted, height: 1.4),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.stockMuted,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 18),
                 ],

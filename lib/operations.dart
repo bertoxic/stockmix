@@ -100,6 +100,28 @@ class _SalePageState extends State<SalePage> {
 
   int get total => cart.total;
 
+  Future<void> _cancelActiveCount() async {
+    final scope = store.count?['scope'] ?? 'All items';
+    final shouldCancel = await confirm(
+      context,
+      'Cancel active stock count?',
+      'This will discard the saved count entries for $scope. Your inventory will stay unchanged, and all items can be sold again.',
+      action: 'Cancel count',
+    );
+    if (!shouldCancel) return;
+    try {
+      await store.cancelCount();
+      if (mounted) {
+        showMessage(
+          context,
+          'Stock count cancelled. All items are available to sell.',
+        );
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    }
+  }
+
   Future<void> checkout() async {
     final accepted = await confirm(
       context,
@@ -217,7 +239,10 @@ class _SalePageState extends State<SalePage> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, 'discard'),
-                child: Text('Discard', style: TextStyle(color: context.stockRust)),
+                child: Text(
+                  'Discard',
+                  style: TextStyle(color: context.stockRust),
+                ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, 'hold'),
@@ -265,6 +290,47 @@ class _SalePageState extends State<SalePage> {
                   'A good find.\nA simple sale.',
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
+                if (store.count != null) ...[
+                  const SizedBox(height: 16),
+                  Surface(
+                    color: context.stockRust.withValues(alpha: .1),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.pause_circle_outline,
+                              color: context.stockRust,
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Some sales are paused',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'A stock count is active for ${store.count?['scope'] ?? 'All items'}. Items in that count cannot be sold until it is finished. To finish it, go to More → Stock count, count the remaining items (use 0 where needed), then review and post it.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.stockMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _cancelActiveCount,
+                          icon: const Icon(Icons.cancel_outlined, size: 18),
+                          label: const Text('Cancel active count'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (store.heldSales.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Surface(
@@ -499,7 +565,10 @@ class _SalePageState extends State<SalePage> {
                       child: Center(
                         child: Text(
                           'No items match "$query"',
-                          style: TextStyle(color: context.stockMuted, fontSize: 13),
+                          style: TextStyle(
+                            color: context.stockMuted,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     )
@@ -544,7 +613,9 @@ class _SalePageState extends State<SalePage> {
                                         : '${money(store, p.price)}  ·  ${store.stock(p)} available',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: isCountLocked ? context.stockRust : context.stockMuted,
+                                      color: isCountLocked
+                                          ? context.stockRust
+                                          : context.stockMuted,
                                     ),
                                   ),
                                   trailing: IconButton.filledTonal(
@@ -606,7 +677,11 @@ class _SalePageState extends State<SalePage> {
                 const SizedBox(height: 12),
                 Text(
                   'Cash recording only. Prices are final; no additional tax or discounts are applied.',
-                  style: TextStyle(fontSize: 11, color: context.stockMuted, height: 1.5),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: context.stockMuted,
+                    height: 1.5,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 FilledButton.icon(
@@ -743,7 +818,11 @@ class _CountPageState extends State<CountPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.storefront_outlined, color: context.stockInk, size: 22),
+                        Icon(
+                          Icons.storefront_outlined,
+                          color: context.stockInk,
+                          size: 22,
+                        ),
                         SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -816,7 +895,10 @@ class _CountPageState extends State<CountPage> {
                           selectedScope == 'All items'
                               ? 'Full store inventory count. Progress saves automatically.'
                               : 'Category count: $selectedScope. Progress saves automatically.',
-                          style: TextStyle(color: context.stockMuted, fontSize: 12),
+                          style: TextStyle(
+                            color: context.stockMuted,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -939,7 +1021,9 @@ class _CountPageState extends State<CountPage> {
                                   : Text(
                                       value?.toString() ?? 'Count',
                                       style: TextStyle(
-                                        color: value == null ? context.stockMuted : context.stockInk,
+                                        color: value == null
+                                            ? context.stockMuted
+                                            : context.stockInk,
                                         fontWeight: FontWeight.w800,
                                         fontSize: value == null ? 12 : 22,
                                       ),
@@ -983,7 +1067,10 @@ class _CountPageState extends State<CountPage> {
                       padding: EdgeInsets.only(top: 10),
                       child: Text(
                         'Count every item, including zeros, before reviewing.',
-                        style: TextStyle(fontSize: 11, color: context.stockMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.stockMuted,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 12),

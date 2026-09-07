@@ -14,39 +14,43 @@ void main() {
       expect(crc, 0xCBF43926);
     });
 
-    test('roundtrips valid SMX1 frame to and from QR string', () {
+    test('roundtrips compact SMX2 byte frames without Base64 expansion', () {
       final dummyData = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
-      final crc = Crc32.compute(dummyData);
       final frame = StreamFrame(
         sessionId: 'a1b2c3d4',
         sequence: 2,
         totalBlocks: 5,
         payloadLength: 42,
         shaPrefix: '9f8e7d6c5b4a3210',
-        crc32: crc,
+        crc32: Crc32.compute(dummyData),
         blockData: dummyData,
         blockIndices: {2},
       );
 
-      final qrString = frame.toQrString();
-      expect(qrString.startsWith('SMX1:a1b2c3d4:2:5:42:9f8e7d6c5b4a3210:'), isTrue);
-
-      final parsed = StreamFrame.parse(qrString);
+      final bytes = frame.toQrBytes();
+      expect(bytes.length, 30 + dummyData.length);
+      final parsed = StreamFrame.parseBytes(bytes);
       expect(parsed, isNotNull);
       expect(parsed!.sessionId, 'a1b2c3d4');
       expect(parsed.sequence, 2);
-      expect(parsed.totalBlocks, 5);
-      expect(parsed.payloadLength, 42);
       expect(parsed.blockData, dummyData);
     });
 
-    test('rejects frame with corrupt CRC32 checksum', () {
+    test('rejects a byte frame with a corrupt CRC32 checksum', () {
       final dummyData = Uint8List.fromList([1, 2, 3, 4, 5]);
-      final b64 = base64Url.encode(dummyData);
-      // Corrupt CRC
-      final corruptString = 'SMX1:sess1:0:1:5:sha12345:deadbeef:$b64';
-      final parsed = StreamFrame.parse(corruptString);
-      expect(parsed, isNull);
+      final frame = StreamFrame(
+        sessionId: 'a1b2c3d4',
+        sequence: 0,
+        totalBlocks: 1,
+        payloadLength: 5,
+        shaPrefix: '9f8e7d6c5b4a3210',
+        crc32: Crc32.compute(dummyData),
+        blockData: dummyData,
+        blockIndices: {0},
+      );
+      final corruptBytes = frame.toQrBytes();
+      corruptBytes[30] ^= 0xff;
+      expect(StreamFrame.parseBytes(corruptBytes), isNull);
     });
   });
 
@@ -103,7 +107,7 @@ void main() {
 
       for (var i = 0; i < prepared.totalBlocks; i++) {
         final frame = encoder.nextFrame();
-        final advanced = decoder.processRawFrame(frame.toQrString());
+        final advanced = decoder.processRawBytes(frame.toQrBytes());
         expect(advanced, isTrue);
       }
 
@@ -114,6 +118,19 @@ void main() {
       expect(result.payload!['shop'], 'Downtown Artisan');
       expect((result.payload!['products'] as List).length, 20);
       expect(result.sha256, prepared.fullSha256);
+    });
+
+    test('reconstructs payload with byte-mode QR frames', () {
+      final prepared = StreamPreparedPayload.fromJson(sampleBundle, blockSize: 150);
+      final encoder = QrStreamEncoder(prepared);
+      final decoder = QrStreamDecoder();
+
+      for (var i = 0; i < prepared.totalBlocks; i++) {
+        final frame = encoder.nextFrame();
+        expect(decoder.processRawBytes(frame.toQrBytes()), isTrue);
+      }
+
+      expect(decoder.verifyAndDecompress().isValid, isTrue);
     });
 
     test('reconstructs payload with out-of-order and duplicate frames', () {
@@ -132,7 +149,7 @@ void main() {
       shuffled.insert(3, frames.first);
 
       for (final f in shuffled) {
-        decoder.processRawFrame(f.toQrString());
+        decoder.processRawBytes(f.toQrBytes());
         if (decoder.isComplete) break;
       }
 
@@ -165,7 +182,7 @@ void main() {
       }
 
       for (final f in streamWithMisses) {
-        decoder.processRawFrame(f.toQrString());
+        decoder.processRawBytes(f.toQrBytes());
         if (decoder.isComplete) break;
       }
 
@@ -181,7 +198,7 @@ void main() {
       final decoder = QrStreamDecoder();
 
       for (var i = 0; i < prepared.totalBlocks; i++) {
-        decoder.processRawFrame(encoder.nextFrame().toQrString());
+        decoder.processRawBytes(encoder.nextFrame().toQrBytes());
       }
 
       expect(decoder.isComplete, isTrue);
@@ -456,7 +473,7 @@ void main() {
       expect(decoder.transferDuration, isNull);
 
       for (var i = 0; i < prepared.totalBlocks; i++) {
-        decoder.processRawFrame(encoder.nextFrame().toQrString());
+        decoder.processRawBytes(encoder.nextFrame().toQrBytes());
       }
 
       expect(decoder.isComplete, isTrue);

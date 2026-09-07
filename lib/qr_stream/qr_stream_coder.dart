@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
 /// IEEE 802.3 32-bit Cyclic Redundancy Check for per-frame validation.
 class Crc32 {
@@ -50,68 +51,163 @@ class DropletPrng {
 }
 
 /// Domain Dictionary Compressor for Stockmix JSON payloads.
-/// Replaces repetitive JSON keys and constant tokens with compact tokens,
-/// significantly shrinking the payload before ZLib and QR slicing.
+/// Safely replaces repetitive JSON keys and fixed enum values with compact tokens,
+/// significantly shrinking the payload before ZLib and QR slicing, while preserving
+/// user text (such as product names or notes) 100% losslessly.
 class DomainDictionaryCompressor {
   static const String magicHeader = 'SMXD1:';
 
-  static const List<MapEntry<String, String>> _keyDictionary = [
-    MapEntry('"format":', '"_f":'),
-    MapEntry('"version":', '"_v":'),
-    MapEntry('"exportedAt":', '"_ea":'),
-    MapEntry('"currency":', '"_c":'),
-    MapEntry('"products":', '"_p":'),
-    MapEntry('"movements":', '"_m":'),
-    MapEntry('"productId":', '"_pi":'),
-    MapEntry('"barcode":', '"_bc":'),
-    MapEntry('"category":', '"_cg":'),
-    MapEntry('"threshold":', '"_th":'),
-    MapEntry('"opening":', '"_op":'),
-    MapEntry('"onHand":', '"_oh":'),
-    MapEntry('"price":', '"_pr":'),
-    MapEntry('"cost":', '"_cs":'),
-    MapEntry('"unit":', '"_un":'),
-    MapEntry('"photo":', '"_ph":'),
-    MapEntry('"name":', '"_nm":'),
-    MapEntry('"kind":', '"_kd":'),
-    MapEntry('"shop":', '"_sh":'),
-    MapEntry('"type":', '"_tp":'),
-    MapEntry('"delta":', '"_dl":'),
-    MapEntry('"note":', '"_nt":'),
-    MapEntry('"reference":', '"_rf":'),
-    MapEntry('"Stock snapshot"', r'"$SS"'),
-    MapEntry('"Day record"', r'"$DR"'),
-    MapEntry('"Sale"', r'"$SL"'),
-    MapEntry('"Received"', r'"$RC"'),
-    MapEntry('"Waste"', r'"$WS"'),
-    MapEntry('"Stock count"', r'"$SC"'),
-    MapEntry('"Return restock"', r'"$RR"'),
-    MapEntry('"Opening stock"', r'"$OS"'),
-  ];
+  static const Map<String, String> _forwardKeyMap = {
+    'format': '_f',
+    'version': '_v',
+    'exportedAt': '_ea',
+    'currency': '_c',
+    'products': '_p',
+    'movements': '_m',
+    'productId': '_pi',
+    'barcode': '_bc',
+    'category': '_cg',
+    'threshold': '_th',
+    'opening': '_op',
+    'onHand': '_oh',
+    'price': '_pr',
+    'cost': '_cs',
+    'unit': '_un',
+    'photo': '_ph',
+    'name': '_nm',
+    'kind': '_kd',
+    'shop': '_sh',
+    'type': '_tp',
+    'delta': '_dl',
+    'note': '_nt',
+    'reference': '_rf',
+    'senderName': '_sn',
+    'packSize': '_ps',
+    'packUnit': '_pu',
+    'packPrice': '_pp',
+    'day': '_d',
+  };
 
-  static const String _nullPhotoPattern = '"_ph":null,';
-  static const String _emptyPhotoPattern = '"photo":null,';
+  static final Map<String, String> _reverseKeyMap = {
+    for (final entry in _forwardKeyMap.entries) entry.value: entry.key,
+  };
+
+  static const Map<String, String> _forwardKindMap = {
+    'Stock snapshot': r'$SS',
+    'Day record': r'$DR',
+  };
+
+  static const Map<String, String> _reverseKindMap = {
+    r'$SS': 'Stock snapshot',
+    r'$DR': 'Day record',
+  };
+
+  static const Map<String, String> _forwardTypeMap = {
+    'Sale': r'$SL',
+    'Received': r'$RC',
+    'Waste': r'$WS',
+    'Stock count': r'$SC',
+    'Return restock': r'$RR',
+    'Opening stock': r'$OS',
+  };
+
+  static const Map<String, String> _reverseTypeMap = {
+    r'$SL': 'Sale',
+    r'$RC': 'Received',
+    r'$WS': 'Waste',
+    r'$SC': 'Stock count',
+    r'$RR': 'Return restock',
+    r'$OS': 'Opening stock',
+  };
+
+  static dynamic _compressNode(dynamic node, {String? keyName}) {
+    if (node is Map) {
+      final result = <String, dynamic>{};
+      for (final entry in node.entries) {
+        final k = entry.key.toString();
+        final v = entry.value;
+        if ((k == 'photo' || k == '_ph') && v == null) continue;
+        final shortenedKey = _forwardKeyMap[k] ?? k;
+        result[shortenedKey] = _compressNode(v, keyName: k);
+      }
+      return result;
+    } else if (node is List) {
+      return node.map((item) => _compressNode(item, keyName: keyName)).toList();
+    } else if (node is String) {
+      if (keyName == 'kind' || keyName == '_kd') {
+        return _forwardKindMap[node] ?? node;
+      }
+      if (keyName == 'type' || keyName == '_tp') {
+        return _forwardTypeMap[node] ?? node;
+      }
+      return node;
+    }
+    return node;
+  }
+
+  static dynamic _decompressNode(dynamic node, {String? keyName}) {
+    if (node is Map) {
+      final result = <String, dynamic>{};
+      for (final entry in node.entries) {
+        final k = entry.key.toString();
+        final v = entry.value;
+        final expandedKey = _reverseKeyMap[k] ?? k;
+        result[expandedKey] = _decompressNode(v, keyName: expandedKey);
+      }
+      return result;
+    } else if (node is List) {
+      return node.map((item) => _decompressNode(item, keyName: keyName)).toList();
+    } else if (node is String) {
+      if (keyName == 'kind' || keyName == '_kd') {
+        return _reverseKindMap[node] ?? node;
+      }
+      if (keyName == 'type' || keyName == '_tp') {
+        return _reverseTypeMap[node] ?? node;
+      }
+      return node;
+    }
+    return node;
+  }
 
   static String compressJsonString(String jsonStr) {
-    var result = jsonStr;
-    // Strip null photo fields to save space
-    result = result.replaceAll(_emptyPhotoPattern, '');
-    for (final entry in _keyDictionary) {
-      result = result.replaceAll(entry.key, entry.value);
+    try {
+      final dynamic decoded = jsonDecode(jsonStr);
+      return compressJsonMap(decoded);
+    } catch (_) {
+      return jsonStr;
     }
-    result = result.replaceAll(_nullPhotoPattern, '');
-    return '$magicHeader$result';
+  }
+
+  static String compressJsonMap(dynamic map) {
+    final compressed = _compressNode(map);
+    return '$magicHeader${jsonEncode(compressed)}';
   }
 
   static String decompressJsonString(String compressedStr) {
     if (!compressedStr.startsWith(magicHeader)) {
-      return compressedStr; // Standard uncompressed JSON
+      return compressedStr;
     }
-    var result = compressedStr.substring(magicHeader.length);
-    for (final entry in _keyDictionary) {
-      result = result.replaceAll(entry.value, entry.key);
+    final content = compressedStr.substring(magicHeader.length);
+    try {
+      final dynamic decoded = jsonDecode(content);
+      final decompressed = _decompressNode(decoded);
+      return jsonEncode(decompressed);
+    } catch (_) {
+      return content;
     }
-    return result;
+  }
+
+  static dynamic decompressToMap(String compressedStr) {
+    if (!compressedStr.startsWith(magicHeader)) {
+      try {
+        return jsonDecode(compressedStr);
+      } catch (_) {
+        return compressedStr;
+      }
+    }
+    final content = compressedStr.substring(magicHeader.length);
+    final dynamic decoded = jsonDecode(content);
+    return _decompressNode(decoded);
   }
 }
 
@@ -159,9 +255,7 @@ class StreamPreparedPayload {
     String? sessionId,
     int blockSize = 200,
   }) {
-    final rawJson = jsonEncode(json);
-    // Apply domain dictionary pre-compression
-    final dictCompressed = DomainDictionaryCompressor.compressJsonString(rawJson);
+    final dictCompressed = DomainDictionaryCompressor.compressJsonMap(json);
     final raw = Uint8List.fromList(utf8.encode(dictCompressed));
     return StreamPreparedPayload.fromBytes(
       raw,
@@ -178,11 +272,15 @@ class StreamPreparedPayload {
 
 /// A single QR stream frame.
 class StreamFrame {
+  static const int _binaryHeaderLength = 54;
+  static const int _legacyBinaryHeaderLength = 30;
+  static const List<int> _binaryMagic = [0x53, 0x4d, 0x58, 0x32]; // SMX2
+
   final String sessionId;
   final int sequence;
   final int totalBlocks;
   final int payloadLength;
-  final String shaPrefix;
+  final String fullSha256;
   final int crc32;
   final Uint8List blockData;
   final Set<int> blockIndices;
@@ -192,55 +290,141 @@ class StreamFrame {
     required this.sequence,
     required this.totalBlocks,
     required this.payloadLength,
-    required this.shaPrefix,
+    String? fullSha256,
+    String? shaPrefix,
     required this.crc32,
     required this.blockData,
     required this.blockIndices,
-  });
+  }) : fullSha256 = fullSha256 ?? shaPrefix ?? '';
 
-  /// Format: `SMX1:<sessionId>:<seq>:<k>:<len>:<shaPrefix>:<crc32Hex>:<b64Data>`
-  String toQrString() {
-    final b64 = base64Url.encode(blockData);
-    final crcHex = crc32.toRadixString(16).padLeft(8, '0');
-    return 'SMX1:$sessionId:$sequence:$totalBlocks:$payloadLength:$shaPrefix:$crcHex:$b64';
+  String get shaPrefix =>
+      fullSha256.length >= 16 ? fullSha256.substring(0, 16) : fullSha256;
+
+  /// Compact byte-mode QR payload. Supports full 256-bit SHA-256 (54-byte header)
+  /// or legacy 64-bit prefix (30-byte header).
+  ///
+  /// V2 Layout (54 B): magic(4) | session(4) | sequence(4) | block count(2) |
+  /// payload length(4) | full SHA-256(32) | CRC-32(4) | encoded block.
+  Uint8List toQrBytes() {
+    final isFullSha = fullSha256.length >= 64;
+    final headerLength = isFullSha ? _binaryHeaderLength : _legacyBinaryHeaderLength;
+    final bytes = Uint8List(headerLength + blockData.length);
+    bytes.setRange(0, _binaryMagic.length, _binaryMagic);
+    final header = ByteData.sublistView(bytes);
+    header.setUint32(4, QrStreamEncoder.sessionToken(sessionId));
+    header.setUint32(8, sequence);
+    header.setUint16(12, totalBlocks);
+    header.setUint32(14, payloadLength);
+
+    if (isFullSha) {
+      final normalizedSha = fullSha256.padRight(64, '0').substring(0, 64);
+      for (var index = 0; index < 32; index++) {
+        header.setUint8(
+          18 + index,
+          int.parse(normalizedSha.substring(index * 2, index * 2 + 2), radix: 16),
+        );
+      }
+      header.setUint32(50, crc32);
+    } else {
+      final normalizedPrefix = fullSha256.padRight(16, '0').substring(0, 16);
+      for (var index = 0; index < 8; index++) {
+        header.setUint8(
+          18 + index,
+          int.parse(normalizedPrefix.substring(index * 2, index * 2 + 2), radix: 16),
+        );
+      }
+      header.setUint32(26, crc32);
+    }
+
+    bytes.setRange(headerLength, bytes.length, blockData);
+    return bytes;
   }
 
-  static StreamFrame? parse(String raw) {
+  static bool isBinaryFrame(Uint8List raw) =>
+      raw.length >= _legacyBinaryHeaderLength &&
+      raw[0] == _binaryMagic[0] &&
+      raw[1] == _binaryMagic[1] &&
+      raw[2] == _binaryMagic[2] &&
+      raw[3] == _binaryMagic[3];
+
+  /// A small, stable key for dropping a repeated camera result before the
+  /// decoder allocates or performs fountain-code work.
+  static String? binaryFrameKey(Uint8List raw) {
+    if (!isBinaryFrame(raw)) return null;
+    final header = ByteData.sublistView(raw);
+    final crcOffset = raw.length >= _binaryHeaderLength ? 50 : 26;
+    return 'SMX2:${header.getUint32(4)}:${header.getUint32(8)}:${header.getUint32(crcOffset)}';
+  }
+
+  static StreamFrame? parseBytes(Uint8List raw) {
     try {
-      final trimmed = raw.trim();
-      if (!trimmed.startsWith('SMX1:')) return null;
-      final parts = trimmed.split(':');
-      if (parts.length != 8) return null;
+      if (!isBinaryFrame(raw)) return null;
+      final header = ByteData.sublistView(raw);
+      final totalBlocks = header.getUint16(12);
+      final payloadLength = header.getUint32(14);
+      if (totalBlocks == 0 || payloadLength == 0) return null;
 
-      final sessionId = parts[1];
-      final seq = int.tryParse(parts[2]);
-      final totalBlocks = int.tryParse(parts[3]);
-      final payloadLength = int.tryParse(parts[4]);
-      final shaPrefix = parts[5];
-      final crcExpected = int.tryParse(parts[6], radix: 16);
-      if (seq == null || totalBlocks == null || payloadLength == null || crcExpected == null) {
-        return null;
+      // 1. Check full 256-bit SHA-256 header (54 bytes)
+      if (raw.length >= _binaryHeaderLength) {
+        final blockData = raw.sublist(_binaryHeaderLength);
+        if (blockData.isNotEmpty) {
+          final crc32 = header.getUint32(50);
+          if (Crc32.compute(blockData) == crc32) {
+            final sessionId = header.getUint32(4).toRadixString(16).padLeft(8, '0');
+            final fullSha256 = List.generate(
+              32,
+              (index) => header.getUint8(18 + index).toRadixString(16).padLeft(2, '0'),
+            ).join();
+            final sequence = header.getUint32(8);
+            return StreamFrame(
+              sessionId: sessionId,
+              sequence: sequence,
+              totalBlocks: totalBlocks,
+              payloadLength: payloadLength,
+              fullSha256: fullSha256,
+              crc32: crc32,
+              blockData: Uint8List.fromList(blockData),
+              blockIndices: QrStreamEncoder.indicesForSeq(
+                sessionId,
+                sequence,
+                totalBlocks,
+              ),
+            );
+          }
+        }
       }
 
-      final blockData = base64Url.decode(parts[7]);
-      final actualCrc = Crc32.compute(blockData);
-      if (actualCrc != crcExpected) {
-        // CRC check failed!
-        return null;
+      // 2. Fallback check for legacy 64-bit prefix header (30 bytes)
+      if (raw.length >= _legacyBinaryHeaderLength) {
+        final blockData = raw.sublist(_legacyBinaryHeaderLength);
+        if (blockData.isNotEmpty) {
+          final crc32 = header.getUint32(26);
+          if (Crc32.compute(blockData) == crc32) {
+            final sessionId = header.getUint32(4).toRadixString(16).padLeft(8, '0');
+            final shaPrefix = List.generate(
+              8,
+              (index) => header.getUint8(18 + index).toRadixString(16).padLeft(2, '0'),
+            ).join();
+            final sequence = header.getUint32(8);
+            return StreamFrame(
+              sessionId: sessionId,
+              sequence: sequence,
+              totalBlocks: totalBlocks,
+              payloadLength: payloadLength,
+              fullSha256: shaPrefix,
+              crc32: crc32,
+              blockData: Uint8List.fromList(blockData),
+              blockIndices: QrStreamEncoder.indicesForSeq(
+                sessionId,
+                sequence,
+                totalBlocks,
+              ),
+            );
+          }
+        }
       }
 
-      final indices = QrStreamEncoder.indicesForSeq(sessionId, seq, totalBlocks);
-
-      return StreamFrame(
-        sessionId: sessionId,
-        sequence: seq,
-        totalBlocks: totalBlocks,
-        payloadLength: payloadLength,
-        shaPrefix: shaPrefix,
-        crc32: crcExpected,
-        blockData: blockData,
-        blockIndices: indices,
-      );
+      return null;
     } catch (_) {
       return null;
     }
@@ -277,8 +461,20 @@ class QrStreamEncoder {
   int get totalBlocks => payload.totalBlocks;
   int get blockSize => payload.blockSize;
 
+  /// Converts any legacy/custom session label to the 32-bit session token
+  /// carried by the byte-mode frame. Generated sessions are already 8 hex
+  /// digits, so this is lossless for live transfers.
+  static int sessionToken(String sessionId) {
+    final parsed = int.tryParse(sessionId, radix: 16);
+    if (parsed != null && sessionId.length <= 8) return parsed & 0xFFFFFFFF;
+    return Crc32.compute(utf8.encode(sessionId));
+  }
+
   /// Generate pseudo-random or systematic block indices for a given sequence number.
-  static Set<int> indicesForSeq(String sessionId, int seq, int k) {
+  static Set<int> indicesForSeq(String sessionId, int seq, int k) =>
+      _indicesForSeed(sessionToken(sessionId), seq, k);
+
+  static Set<int> _indicesForSeed(int sessionSeed, int seq, int k) {
     if (k <= 1) return {0};
     // Phase 1: Systematic burst (seq < k)
     if (seq < k) {
@@ -295,8 +491,7 @@ class QrStreamEncoder {
     }
 
     // Phase 3: Rateless Luby Transform droplet phase with robust degree distribution
-    // Seed = hash(sessionId) ^ (seq * 0x9E3779B9)
-    final sessionSeed = sessionId.hashCode;
+    // Seed = session token ^ (seq * 0x9E3779B9)
     final seed = (sessionSeed ^ (seq * 0x9E3779B9)) & 0xFFFFFFFF;
     final prng = DropletPrng(seed);
 
@@ -340,14 +535,13 @@ class QrStreamEncoder {
     }
 
     final crc = Crc32.compute(dropletData);
-    final shaPrefix = payload.fullSha256.substring(0, 16);
 
     return StreamFrame(
       sessionId: payload.sessionId,
       sequence: seq,
       totalBlocks: payload.totalBlocks,
       payloadLength: payload.compressedData.length,
-      shaPrefix: shaPrefix,
+      fullSha256: payload.fullSha256,
       crc32: crc,
       blockData: dropletData,
       blockIndices: indices,
@@ -398,6 +592,7 @@ class QrStreamDecoder {
   String? _currentSessionId;
   int _totalBlocks = 0;
   int _payloadLength = 0;
+  String? _expectedFullSha256;
   String? _shaPrefix;
   int _blockSize = 0;
 
@@ -424,6 +619,12 @@ class QrStreamDecoder {
   int get payloadLength => _payloadLength;
   DateTime? get firstFrameAt => _firstFrameAt;
   DateTime? get completedAt => _completedAt;
+
+  int get resolvedCount => _resolvedCount;
+  int get totalBlocks => _totalBlocks;
+  double get progress => _totalBlocks == 0 ? 0.0 : (_resolvedCount / _totalBlocks).clamp(0.0, 1.0);
+  bool isBlockResolved(int index) =>
+      index >= 0 && index < _resolvedBlocks.length && _resolvedBlocks[index] != null;
 
   Duration? get transferDuration {
     if (_firstFrameAt == null) return null;
@@ -452,22 +653,20 @@ class QrStreamDecoder {
     );
   }
 
-  /// Process an incoming QR frame string. Returns true if this frame advanced the reconstruction.
-  bool processRawFrame(String raw) {
+  /// Process a compact byte-mode SMX2 QR frame.
+  bool processRawBytes(Uint8List raw) {
     _framesCaptured++;
-    final frame = StreamFrame.parse(raw);
+    final frame = StreamFrame.parseBytes(raw);
     if (frame == null) {
       _rejectedFrames++;
       return false;
     }
 
     _firstFrameAt ??= DateTime.now();
-
-    // Initialize or switch session if appropriate
-    if (_currentSessionId == null || (_resolvedCount == 0 && _currentSessionId != frame.sessionId)) {
+    if (_currentSessionId == null ||
+        (_resolvedCount == 0 && _currentSessionId != frame.sessionId)) {
       _initSession(frame);
     } else if (frame.sessionId != _currentSessionId) {
-      // Different session while one is already in progress
       _rejectedFrames++;
       return false;
     }
@@ -476,7 +675,6 @@ class QrStreamDecoder {
       _duplicateFrames++;
       return false;
     }
-
     return _processFrame(frame);
   }
 
@@ -484,6 +682,7 @@ class QrStreamDecoder {
     _currentSessionId = frame.sessionId;
     _totalBlocks = frame.totalBlocks;
     _payloadLength = frame.payloadLength;
+    _expectedFullSha256 = frame.fullSha256;
     _shaPrefix = frame.shaPrefix;
     _blockSize = frame.blockData.length;
     _resolvedBlocks = List<Uint8List?>.filled(_totalBlocks, null);
@@ -616,43 +815,47 @@ class QrStreamDecoder {
   /// Decompresses the data and returns the decoded UTF-8 string or JSON.
   VerificationResult verifyAndDecompress({String? expectedFullSha256}) {
     if (!isComplete || _reconstructedPayload == null) {
-      return VerificationResult.failure('Reconstruction incomplete: $_resolvedCount of $_totalBlocks blocks');
+      return VerificationResult.failure(
+        'Reconstruction incomplete: $_resolvedCount of $_totalBlocks blocks',
+      );
     }
 
-    try {
-      // Decompress ZLib
-      final decompressed = Uint8List.fromList(
-        ZLibDecoder().decodeBytes(_reconstructedPayload!),
-      );
+    final job = _DecompressJob(
+      reconstructedPayload: _reconstructedPayload!,
+      payloadLength: _payloadLength,
+      expectedFullSha256: expectedFullSha256 ?? _expectedFullSha256,
+      shaPrefix: _shaPrefix,
+      transferDuration: transferDuration,
+    );
 
-      final fullSha = sha256.convert(decompressed).toString();
-      _verifiedSha256 = fullSha;
-
-      if (_shaPrefix != null && !fullSha.startsWith(_shaPrefix!)) {
-        return VerificationResult.failure('SHA-256 prefix mismatch. Data may be corrupted.');
-      }
-
-      if (expectedFullSha256 != null && expectedFullSha256 != fullSha) {
-        return VerificationResult.failure('Full SHA-256 hash mismatch.');
-      }
-
-      final rawUtf8String = utf8.decode(decompressed);
-      // Transparently decompress domain dictionary if used
-      final jsonString = DomainDictionaryCompressor.decompressJsonString(rawUtf8String);
-      final dynamic decoded = jsonDecode(jsonString);
-      if (decoded is! Map<String, dynamic>) {
-        return VerificationResult.failure('Decoded payload is not a valid Stockmix bundle.');
-      }
-
-      return VerificationResult.success(
-        payload: decoded,
-        sha256: fullSha,
-        rawBytesLength: decompressed.length,
-        transferDuration: transferDuration,
-      );
-    } catch (e) {
-      return VerificationResult.failure('Decompression or JSON parse error: $e');
+    final result = _verifyAndDecompressWorker(job);
+    if (result.isValid && result.sha256 != null) {
+      _verifiedSha256 = result.sha256;
     }
+    return result;
+  }
+
+  /// Finalize and verify the full reconstructed payload on a background worker isolate.
+  Future<VerificationResult> verifyAndDecompressAsync({String? expectedFullSha256}) async {
+    if (!isComplete || _reconstructedPayload == null) {
+      return VerificationResult.failure(
+        'Reconstruction incomplete: $_resolvedCount of $_totalBlocks blocks',
+      );
+    }
+
+    final job = _DecompressJob(
+      reconstructedPayload: _reconstructedPayload!,
+      payloadLength: _payloadLength,
+      expectedFullSha256: expectedFullSha256 ?? _expectedFullSha256,
+      shaPrefix: _shaPrefix,
+      transferDuration: transferDuration,
+    );
+
+    final result = await compute(_verifyAndDecompressWorker, job);
+    if (result.isValid && result.sha256 != null) {
+      _verifiedSha256 = result.sha256;
+    }
+    return result;
   }
 
   static void _xorInPlace(Uint8List a, Uint8List b) {
@@ -682,6 +885,7 @@ class QrStreamDecoder {
     _currentSessionId = null;
     _totalBlocks = 0;
     _payloadLength = 0;
+    _expectedFullSha256 = null;
     _shaPrefix = null;
     _blockSize = 0;
     _resolvedBlocks.clear();
@@ -695,6 +899,56 @@ class QrStreamDecoder {
     _verifiedSha256 = null;
     _firstFrameAt = null;
     _completedAt = null;
+  }
+}
+
+class _DecompressJob {
+  final Uint8List reconstructedPayload;
+  final int payloadLength;
+  final String? expectedFullSha256;
+  final String? shaPrefix;
+  final Duration? transferDuration;
+
+  _DecompressJob({
+    required this.reconstructedPayload,
+    required this.payloadLength,
+    this.expectedFullSha256,
+    this.shaPrefix,
+    this.transferDuration,
+  });
+}
+
+VerificationResult _verifyAndDecompressWorker(_DecompressJob job) {
+  try {
+    final decompressed = Uint8List.fromList(
+      ZLibDecoder().decodeBytes(job.reconstructedPayload),
+    );
+
+    final fullSha = sha256.convert(decompressed).toString();
+
+    final targetFullSha = job.expectedFullSha256;
+    if (targetFullSha != null && targetFullSha.length == 64) {
+      if (fullSha.toLowerCase() != targetFullSha.toLowerCase()) {
+        return VerificationResult.failure('Full SHA-256 hash mismatch. Data may be corrupted.');
+      }
+    } else if (job.shaPrefix != null && !fullSha.startsWith(job.shaPrefix!)) {
+      return VerificationResult.failure('SHA-256 prefix mismatch. Data may be corrupted.');
+    }
+
+    final rawUtf8String = utf8.decode(decompressed);
+    final dynamic decoded = DomainDictionaryCompressor.decompressToMap(rawUtf8String);
+    if (decoded is! Map<String, dynamic>) {
+      return VerificationResult.failure('Decoded payload is not a valid Stockmix bundle.');
+    }
+
+    return VerificationResult.success(
+      payload: decoded,
+      sha256: fullSha,
+      rawBytesLength: decompressed.length,
+      transferDuration: job.transferDuration,
+    );
+  } catch (e) {
+    return VerificationResult.failure('Decompression or JSON parse error: $e');
   }
 }
 

@@ -88,6 +88,7 @@ class StreamImportAnalysis {
   final String bundleId;
   final String bundleKind;
   final String shopName;
+  final String senderName;
   final String currency;
   final DateTime exportedAt;
   final String bundleHash;
@@ -100,6 +101,7 @@ class StreamImportAnalysis {
     required this.bundleId,
     required this.bundleKind,
     required this.shopName,
+    this.senderName = '',
     required this.currency,
     required this.exportedAt,
     required this.bundleHash,
@@ -130,6 +132,7 @@ class StreamImportAnalysis {
     final bundleId = bundle['id']?.toString() ?? '';
     final bundleKind = bundle['kind']?.toString() ?? 'Stock snapshot';
     final shopName = bundle['shop']?.toString() ?? 'Shared store';
+    final senderName = bundle['senderName']?.toString() ?? shopName;
     final currency = bundle['currency']?.toString() ?? store.currency;
     final exportedAt =
         DateTime.tryParse(bundle['exportedAt']?.toString() ?? '') ??
@@ -249,6 +252,7 @@ class StreamImportAnalysis {
       bundleId: bundleId,
       bundleKind: bundleKind,
       shopName: shopName,
+      senderName: senderName,
       currency: currency,
       exportedAt: exportedAt,
       bundleHash: bundleHash,

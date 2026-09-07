@@ -290,6 +290,7 @@ class _ProductFormState extends State<ProductForm> {
       unit,
       packSize,
       packPrice;
+  late final FocusNode categoryFocus;
   String? photo;
   DateTime? expiryDate;
   bool saving = false;
@@ -312,6 +313,7 @@ class _ProductFormState extends State<ProductForm> {
     threshold = TextEditingController(text: '${p?.threshold ?? 5}');
     code = TextEditingController(text: p?.barcode ?? widget.barcode);
     category = TextEditingController(text: p?.category ?? '');
+    categoryFocus = FocusNode()..addListener(_onCategoryFocusChanged);
     unit = TextEditingController(text: p?.unit ?? 'pcs');
     packSize = TextEditingController(text: '${p?.packSize ?? 10}');
     packPrice = TextEditingController(
@@ -325,8 +327,38 @@ class _ProductFormState extends State<ProductForm> {
     expiryDate = p?.expiryDate;
   }
 
+  bool get _addingBlockedByCount =>
+      widget.product == null && widget.store.count != null;
+
+  void _onCategoryFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _cancelActiveCount() async {
+    final scope = widget.store.count?['scope'] ?? 'All items';
+    final shouldCancel = await confirm(
+      context,
+      'Cancel active stock count?',
+      'This will discard the saved count entries for $scope. Your inventory will stay unchanged, and you can add items again.',
+      action: 'Cancel count',
+    );
+    if (!shouldCancel) return;
+    try {
+      await widget.store.cancelCount();
+      if (mounted) {
+        setState(() {});
+        showMessage(context, 'Stock count cancelled. You can add items again.');
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    }
+  }
+
   @override
   void dispose() {
+    categoryFocus
+      ..removeListener(_onCategoryFocusChanged)
+      ..dispose();
     for (final c in [
       name,
       price,
@@ -401,6 +433,7 @@ class _ProductFormState extends State<ProductForm> {
   }
 
   Future<void> save() async {
+    if (_addingBlockedByCount) return;
     if (!form.currentState!.validate()) return;
     if (_isSellingAtLoss) {
       final confirm = await showDialog<bool>(
@@ -546,6 +579,47 @@ class _ProductFormState extends State<ProductForm> {
                 'A clear name, a price, and you’re ready to go.',
                 style: TextStyle(color: context.stockMuted),
               ),
+              if (_addingBlockedByCount) ...[
+                const SizedBox(height: 18),
+                Surface(
+                  color: context.stockRust.withValues(alpha: .1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.pause_circle_outline,
+                            color: context.stockRust,
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Adding items is paused',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'A stock count is active for ${widget.store.count?['scope'] ?? 'All items'}, so new items are paused to keep the count accurate. To finish it, go to More → Stock count, count the remaining items (use 0 where needed), then review and post it.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.stockMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _cancelActiveCount,
+                        icon: const Icon(Icons.cancel_outlined, size: 18),
+                        label: const Text('Cancel active count'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               PhotoInput(
                 value: photo,
@@ -723,13 +797,15 @@ class _ProductFormState extends State<ProductForm> {
                       children: [
                         TextFormField(
                           controller: category,
+                          focusNode: categoryFocus,
                           maxLength: 40,
                           onChanged: (_) => setState(() {}),
                           decoration: const InputDecoration(
                             labelText: 'Category',
                           ),
                         ),
-                        if (_categorySuggestions.isNotEmpty) ...[
+                        if (categoryFocus.hasFocus &&
+                            _categorySuggestions.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Wrap(
                             spacing: 6,
@@ -896,7 +972,7 @@ class _ProductFormState extends State<ProductForm> {
               ),
               const SizedBox(height: 28),
               FilledButton.icon(
-                onPressed: saving ? null : save,
+                onPressed: saving || _addingBlockedByCount ? null : save,
                 icon: const Icon(Icons.check),
                 label: Text(saving ? 'Saving…' : 'Save item'),
               ),
@@ -1115,6 +1191,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
                     : 'Stock will be saved in ${widget.product.unit}.',
                 style: TextStyle(fontSize: 11, color: context.stockMuted),
               ),
+              const SizedBox(height: 16),
             ],
             TextField(
               controller: quantity,

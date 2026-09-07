@@ -400,6 +400,7 @@ class StockStore extends ChangeNotifier {
   List<Map<String, dynamic>> _heldSales = [];
   Map<String, dynamic>? count;
   String shop = 'My store', currency = 'USD';
+  String userName = '';
   bool setupCompleted = false;
   String? lastBackupAt;
   bool busy = false;
@@ -442,6 +443,7 @@ class StockStore extends ChangeNotifier {
     'heldSales': _heldSales,
     'count': count,
     'shop': shop,
+    'userName': userName,
     'currency': currency,
     'setupCompleted': setupCompleted,
     'lastBackupAt': lastBackupAt,
@@ -468,6 +470,7 @@ class StockStore extends ChangeNotifier {
         ? null
         : Map<String, dynamic>.from(data['count']);
     shop = data['shop'] ?? 'My store';
+    userName = data['userName'] ?? '';
     currency = data['currency'] ?? 'USD';
     setupCompleted =
         data['setupCompleted'] ??
@@ -612,6 +615,7 @@ class StockStore extends ChangeNotifier {
 
   Future<void> updateSettings({
     String? storeName,
+    String? userName,
     String? currencyCode,
     bool? sound,
     bool? haptics,
@@ -621,6 +625,7 @@ class StockStore extends ChangeNotifier {
     if (storeName != null && storeName.trim().isNotEmpty) {
       shop = storeName.trim();
     }
+    if (userName != null) this.userName = userName.trim();
     if (currencyCode != null && currencyCode.trim().isNotEmpty) {
       currency = currencyCode.trim();
     }
@@ -1264,6 +1269,7 @@ class StockStore extends ChangeNotifier {
         ? null
         : Map<String, dynamic>.from(data['count']);
     shop = data['shop'] ?? 'My store';
+    userName = data['userName'] ?? '';
     currency = data['currency'] ?? 'USD';
     setupCompleted = true;
     lastBackupAt = DateTime.now().toUtc().toIso8601String();
@@ -1275,6 +1281,7 @@ class StockStore extends ChangeNotifier {
     'id': newId(),
     'kind': day == null ? 'Stock snapshot' : 'Day record',
     'shop': shop,
+    'senderName': userName.trim().isEmpty ? shop : userName.trim(),
     'currency': currency,
     'exportedAt': DateTime.now().toUtc().toIso8601String(),
     'day': day == null ? null : dayKey(day),
@@ -1299,6 +1306,7 @@ class StockStore extends ChangeNotifier {
         value['version'] != 1 ||
         value['id'] is! String ||
         value['shop'] is! String ||
+        (value['senderName'] != null && value['senderName'] is! String) ||
         value['products'] is! List ||
         value['movements'] is! List ||
         !['Stock snapshot', 'Day record'].contains(value['kind'])) {

@@ -12,6 +12,7 @@ import 'settings_page.dart';
 import 'sharing.dart';
 import 'stock_store.dart';
 import 'qr_stream/qr_stream_receiver_page.dart';
+import 'qr_stream/qr_stream_sender_page.dart';
 
 String money(StockStore store, int cents) =>
     NumberFormat.simpleCurrency(name: store.currency).format(cents / 100);
@@ -258,6 +259,92 @@ class _StockShellState extends State<StockShell> {
 
   void open(Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  Future<void> _showShareSaleOptions() async {
+    var selectedSaleDay = DateTime.now();
+    final direction = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dayKey(selectedSaleDay) == dayKey(DateTime.now())
+                              ? 'Share today’s sales'
+                              : 'Share ${DateFormat('d MMM').format(selectedSaleDay)} sales',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: constraints.maxWidth * .4,
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            final day = await showDatePicker(
+                              context: sheetContext,
+                              initialDate: selectedSaleDay,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now(),
+                            );
+                            if (day != null) {
+                              setSheetState(() => selectedSaleDay = day);
+                            }
+                          },
+                          child: Text(
+                            dayKey(selectedSaleDay) == dayKey(DateTime.now())
+                                ? 'Today'
+                                : DateFormat('d MMM').format(selectedSaleDay),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Send that day’s sale record or receive one from another Stockmix user.',
+                  style: TextStyle(color: sheetContext.stockMuted),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, 'send'),
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: const Text('Send sale by QR'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, 'receive'),
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Receive sale by QR'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || direction == null) return;
+    if (direction == 'send') {
+      open(
+        QrStreamSenderPage(
+          store: store,
+          bundle: store.bundle(day: selectedSaleDay),
+        ),
+      );
+    } else if (direction == 'receive') {
+      open(QrStreamReceiverPage(store: store));
+    }
+  }
+
   Future<void> scan() async {
     final resultCart = await Navigator.push<Map<String, int>>(
       context,
@@ -912,10 +999,10 @@ class _StockShellState extends State<StockShell> {
           ),
           const SizedBox(width: 12),
           quickAction(
-            'Count stock',
-            Icons.fact_check_outlined,
+            'Share sale',
+            Icons.qr_code_2_rounded,
             paper,
-            () => open(CountPage(store: store)),
+            _showShareSaleOptions,
           ),
         ],
       ),
@@ -1623,6 +1710,54 @@ class _StockShellState extends State<StockShell> {
               onPressed: _promptReceiptSearch,
               icon: const Icon(Icons.search_rounded, size: 20),
             ),
+            const SizedBox(width: 8),
+            PopupMenuButton<int>(
+              tooltip: 'Filter day activity',
+              initialValue: dailyActivityFilter,
+              onSelected: (value) => setState(() {
+                dailyActivityFilter = value;
+                showAllRecords = false;
+              }),
+              itemBuilder: (context) => [
+                for (final option in const [
+                  (0, 'All activity'),
+                  (1, 'Sales & refunds'),
+                  (2, 'Stock activity'),
+                ])
+                  PopupMenuItem(
+                    value: option.$1,
+                    child: Row(
+                      children: [
+                        Icon(
+                          dailyActivityFilter == option.$1
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          size: 18,
+                          color: dailyActivityFilter == option.$1
+                              ? avocado
+                              : context.stockMuted,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(option.$2),
+                      ],
+                    ),
+                  ),
+              ],
+              icon: Icon(
+                Icons.filter_list_rounded,
+                color: dailyActivityFilter == 1
+                    ? context.stockInk
+                    : context.stockMuted,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor:
+                    dailyActivityFilter == 1 ? avocado : context.stockPaper,
+                side: BorderSide(color: context.stockLine),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1665,19 +1800,6 @@ class _StockShellState extends State<StockShell> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 18),
-        SegmentedButton<int>(
-          segments: const [
-            ButtonSegment(value: 0, label: Text('All')),
-            ButtonSegment(value: 1, label: Text('Sales & refunds')),
-            ButtonSegment(value: 2, label: Text('Stock')),
-          ],
-          selected: {dailyActivityFilter},
-          onSelectionChanged: (selection) => setState(() {
-            dailyActivityFilter = selection.first;
-            showAllRecords = false;
-          }),
         ),
         const SizedBox(height: 18),
         Surface(
@@ -2122,11 +2244,9 @@ class _StockShellState extends State<StockShell> {
             () => open(ReceivedPage(store: store)),
           ),
           menu(
-            Icons.backup_outlined,
+            Icons.settings_backup_restore_outlined,
             'Full backup & restore',
-            store.lastBackupAt == null
-                ? 'Never backed up · Tap to protect data'
-                : 'Last backed up: ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(store.lastBackupAt!).toLocal())}',
+            'Save everything or restore a previous backup file',
             () => open(BackupRestorePage(store: store)),
           ),
         ],

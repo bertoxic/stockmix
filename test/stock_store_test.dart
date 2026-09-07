@@ -66,6 +66,16 @@ void main() {
       throwsStateError,
     );
   });
+  test('sender name is included in shared records', () async {
+    await store.updateSettings(userName: 'Maya Okafor');
+
+    final shared = StockStore.decodeBundle(jsonEncode(store.bundle()));
+    final recipient = StockStore(persist: (_) async {});
+    await recipient.importBundle(shared);
+
+    expect(shared['senderName'], 'Maya Okafor');
+    expect(recipient.received.single['senderName'], 'Maya Okafor');
+  });
   test('price change leaves historical sale totals intact', () async {
     await store.saveProduct(item());
     await store.checkout({'p1': 2}, '');

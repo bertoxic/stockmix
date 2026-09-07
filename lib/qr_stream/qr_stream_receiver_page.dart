@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -54,6 +55,17 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
 
   final Map<String, DateTime> _recentlySeenCodes = {};
 
+  Uint8List? _decodedBytes(Barcode barcode) {
+    final decoded = barcode.rawDecodedBytes;
+    if (decoded is DecodedBarcodeBytes) return decoded.bytes;
+    if (decoded is DecodedVisionBarcodeBytes) return decoded.bytes;
+    return barcode.rawBytes;
+  }
+
+  void _finishIfComplete() {
+    if (decoder.isComplete && !finished) _handleCompletion();
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (finished) return;
     final now = DateTime.now();
@@ -62,30 +74,22 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
     _recentlySeenCodes.removeWhere((_, time) => now.difference(time).inMilliseconds > 120);
 
     for (final barcode in capture.barcodes) {
-      final val = barcode.rawValue;
-      if (val == null || !val.startsWith('SMX1:')) continue;
+      final bytes = _decodedBytes(barcode);
+      if (bytes != null && StreamFrame.isBinaryFrame(bytes)) {
+        final key = StreamFrame.binaryFrameKey(bytes)!;
+        if (_recentlySeenCodes.containsKey(key)) continue;
+        _recentlySeenCodes[key] = now;
 
-      if (_recentlySeenCodes.containsKey(val)) {
+        final beforeResolved = decoder.stats.resolvedBlocks;
+        decoder.processRawBytes(bytes);
+        final afterResolved = decoder.stats.resolvedBlocks;
+        if (mounted) setState(() {});
+        if (afterResolved > beforeResolved) HapticFeedback.selectionClick();
+        _finishIfComplete();
+        if (finished) break;
         continue;
       }
-      _recentlySeenCodes[val] = now;
 
-      final beforeResolved = decoder.stats.resolvedBlocks;
-      decoder.processRawFrame(val);
-      final afterResolved = decoder.stats.resolvedBlocks;
-
-      if (mounted) {
-        setState(() {});
-      }
-
-      if (afterResolved > beforeResolved) {
-        HapticFeedback.selectionClick();
-      }
-
-      if (decoder.isComplete && !finished) {
-        _handleCompletion();
-        break;
-      }
     }
   }
 

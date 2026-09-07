@@ -5,10 +5,39 @@ import 'package:stockmix/forms.dart';
 import 'package:stockmix/main.dart';
 import 'package:stockmix/operations.dart';
 import 'package:stockmix/pages.dart';
+import 'package:stockmix/reorder_page.dart';
 import 'package:stockmix/scanner_page.dart';
 import 'package:stockmix/stock_store.dart';
 
 void main() {
+  testWidgets('reorder quantity controls wrap on narrow phones', (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = StockStore(persist: (_) async {});
+    await store.saveProduct(
+      const Product(
+        id: 'low-item',
+        name: 'Low stock item',
+        category: 'General',
+        barcode: 'LOW',
+        price: 250,
+        cost: 175,
+        opening: 0,
+        threshold: 3,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(theme: stockTheme(), home: ReorderPage(store: store)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Order quantity:'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'phone navigates inventory, item details, and sales without overflow',
     (tester) async {
@@ -76,6 +105,75 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Item name'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('home Share sale opens send and receive QR choices', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = StockStore(persist: (_) async {});
+    await tester.pumpWidget(StockmixApp(store: store));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Share sale'), 250);
+    await tester.ensureVisible(find.text('Share sale'));
+    await tester.tap(
+      find
+          .ancestor(of: find.text('Share sale'), matching: find.byType(InkWell))
+          .last,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Share today’s sales'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Send sale by QR'), findsOneWidget);
+    expect(find.text('Receive sale by QR'), findsOneWidget);
+
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('new sale explains an active count and can cancel it', (
+    tester,
+  ) async {
+    final store = StockStore(persist: (_) async {});
+    await store.saveProduct(
+      const Product(
+        id: 'p1',
+        name: 'Counted item',
+        category: 'General',
+        barcode: '111',
+        price: 100,
+        cost: 50,
+        opening: 1,
+        threshold: 0,
+      ),
+    );
+    await store.startCount();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: stockTheme(),
+        home: SalePage(store: store),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Some sales are paused'), findsOneWidget);
+    expect(find.text('Cancel active count'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel active count'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel count'));
+    await tester.pumpAndSettle();
+
+    expect(store.count, isNull);
   });
 
   testWidgets(
@@ -523,10 +621,7 @@ void main() {
       expect(find.text('Confirm return'), findsOneWidget);
       await tester.tap(find.text('Confirm return'));
       await tester.pumpAndSettle();
-      expect(
-        store.stock(p1),
-        p1StockAfterPurchase + 1,
-      );
+      expect(store.stock(p1), p1StockAfterPurchase + 1);
 
       // Reopen and return every remaining line in the same purchase.
       await tester.tap(find.byType(DailySaleGroupTile).first);
@@ -540,40 +635,39 @@ void main() {
     },
   );
 
-  testWidgets(
-    'More tab has Store settings which navigates to StoreSettingsPage and backup at bottom',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('More tab has Store settings and a full backup entry', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      final store = StockStore(persist: (_) async {});
-      await store.loadDemo();
+    final store = StockStore(persist: (_) async {});
+    await store.loadDemo();
 
-      await tester.pumpWidget(StockmixApp(store: store));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(StockmixApp(store: store));
+    await tester.pumpAndSettle();
 
-      // Tap More tab
-      await tester.tap(find.text('More'));
-      await tester.pumpAndSettle();
+    // Tap More tab
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
 
-      // Verify Stock count and Shopping & reorder list are present
-      expect(find.text('Stock count'), findsOneWidget);
-      expect(find.text('Shopping & reorder list'), findsOneWidget);
-      expect(find.text('Full backup & restore'), findsOneWidget);
-      // Standalone "Import a file" should no longer be present
-      expect(find.text('Import a file'), findsNothing);
+    // Verify Stock count and Shopping & reorder list are present.
+    expect(find.text('Stock count'), findsOneWidget);
+    expect(find.text('Shopping & reorder list'), findsOneWidget);
+    expect(find.text('Full backup & restore'), findsOneWidget);
+    // Standalone "Import a file" should no longer be present
+    expect(find.text('Import a file'), findsNothing);
 
-      // Tap Store settings
-      await tester.tap(find.text('Store settings'));
-      await tester.pumpAndSettle();
+    // Tap Store settings
+    await tester.tap(find.text('Store settings'));
+    await tester.pumpAndSettle();
 
-      // Should be in StoreSettingsPage
-      expect(find.text('Store & App Settings'), findsOneWidget);
-      expect(find.text('Scan audio tone'), findsOneWidget);
-      expect(find.text('Haptic vibration'), findsOneWidget);
-      expect(find.text('Light Theme (Default)'), findsOneWidget);
-    },
-  );
+    // Should be in StoreSettingsPage
+    expect(find.text('Store & App Settings'), findsOneWidget);
+    expect(find.text('Scan audio tone'), findsOneWidget);
+    expect(find.text('Haptic vibration'), findsOneWidget);
+    expect(find.text('Your name'), findsOneWidget);
+  });
 }

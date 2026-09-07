@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:qr/qr.dart' as qr;
 import 'package:qr_flutter/qr_flutter.dart';
 import '../design.dart';
 import '../stock_store.dart';
@@ -41,7 +42,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
   int intervalMs = 120;
   bool paused = false;
   bool includePhotos = false;
-  QrDisplayMode displayMode = QrDisplayMode.single;
+  QrDisplayMode displayMode = QrDisplayMode.dualSideBySide;
 
   @override
   void initState() {
@@ -99,7 +100,8 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
   void _advanceFrame() {
     setState(() {
       currentFrame = encoder.nextFrame();
-      if (displayMode == QrDisplayMode.dualStacked || displayMode == QrDisplayMode.dualSideBySide) {
+      if (displayMode == QrDisplayMode.dualStacked ||
+          displayMode == QrDisplayMode.dualSideBySide) {
         secondFrame = encoder.nextFrame();
       } else {
         secondFrame = null;
@@ -125,6 +127,18 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
     _startTimer();
   }
 
+  Widget _binaryQr(StreamFrame frame, {required EdgeInsets padding}) =>
+      QrImageView.withQr(
+        qr: qr.QrCode.fromUint8List(
+          data: frame.toQrBytes(),
+          errorCorrectLevel: qr.QrErrorCorrectLevel.L,
+        ),
+        version: QrVersions.auto,
+        gapless: true,
+        padding: padding,
+        errorCorrectionLevel: QrErrorCorrectLevel.L,
+      );
+
   @override
   void dispose() {
     animationTimer?.cancel();
@@ -137,7 +151,6 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
     final totalBlocks = preparedPayload.totalBlocks;
     final isDroplet = frame != null && frame.sequence >= totalBlocks;
     final seqDisplay = frame != null ? frame.sequence + 1 : 0;
-    final qrData = frame?.toQrString() ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -168,11 +181,15 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
               const SizedBox(height: 16),
 
               // Animated QR Screen Display
-              if (displayMode == QrDisplayMode.dualStacked && secondFrame != null) ...[
+              if (displayMode == QrDisplayMode.dualStacked &&
+                  secondFrame != null) ...[
                 Center(
                   child: Container(
                     width: 320,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -189,46 +206,61 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                       children: [
                         SizedBox(
                           height: 160,
-                          child: qrData.isNotEmpty
-                              ? QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  gapless: true,
+                          child: frame != null
+                              ? _binaryQr(
+                                  frame,
                                   padding: const EdgeInsets.all(4),
-                                  errorCorrectionLevel: QrErrorCorrectLevel.L,
                                 )
-                              : const Center(child: CircularProgressIndicator()),
+                              : const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
                         ),
                         Text(
                           'Stream A (Seq #${frame!.sequence + 1})',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: context.stockMuted,
+                          ),
                         ),
                         const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-                          child: Divider(height: 1, thickness: 0.5, color: cement),
+                          padding: EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 16,
+                          ),
+                          child: Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color: cement,
+                          ),
                         ),
                         SizedBox(
                           height: 160,
-                          child: QrImageView(
-                            data: secondFrame!.toQrString(),
-                            version: QrVersions.auto,
-                            gapless: true,
+                          child: _binaryQr(
+                            secondFrame!,
                             padding: const EdgeInsets.all(4),
-                            errorCorrectionLevel: QrErrorCorrectLevel.L,
                           ),
                         ),
                         Text(
                           'Stream B (Seq #${secondFrame!.sequence + 1})',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: context.stockMuted,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ] else if (displayMode == QrDisplayMode.dualSideBySide && secondFrame != null) ...[
+              ] else if (displayMode == QrDisplayMode.dualSideBySide &&
+                  secondFrame != null) ...[
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -249,20 +281,23 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                             SizedBox(
                               width: 155,
                               height: 155,
-                              child: qrData.isNotEmpty
-                                  ? QrImageView(
-                                      data: qrData,
-                                      version: QrVersions.auto,
-                                      gapless: true,
+                              child: frame != null
+                                  ? _binaryQr(
+                                      frame,
                                       padding: const EdgeInsets.all(4),
-                                      errorCorrectionLevel: QrErrorCorrectLevel.L,
                                     )
-                                  : const Center(child: CircularProgressIndicator()),
+                                  : const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Stream A (#${frame!.sequence + 1})',
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: context.stockMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -278,18 +313,19 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                             SizedBox(
                               width: 155,
                               height: 155,
-                              child: QrImageView(
-                                data: secondFrame!.toQrString(),
-                                version: QrVersions.auto,
-                                gapless: true,
+                              child: _binaryQr(
+                                secondFrame!,
                                 padding: const EdgeInsets.all(4),
-                                errorCorrectionLevel: QrErrorCorrectLevel.L,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Stream B (#${secondFrame!.sequence + 1})',
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: context.stockMuted),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: context.stockMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -314,13 +350,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         ),
                       ],
                     ),
-                    child: qrData.isNotEmpty
-                        ? QrImageView(
-                            data: qrData,
-                            version: QrVersions.auto,
-                            gapless: true,
+                    child: frame != null
+                        ? _binaryQr(
+                            frame,
                             padding: const EdgeInsets.all(6),
-                            errorCorrectionLevel: QrErrorCorrectLevel.L,
                           )
                         : const Center(child: CircularProgressIndicator()),
                   ),
@@ -332,7 +365,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
               // Telemetry & Frame Counter
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: context.stockLinen,
                     borderRadius: BorderRadius.circular(20),
@@ -353,7 +389,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         isDroplet
                             ? 'Fountain Droplet #$seqDisplay ($totalBlocks source blocks)'
                             : 'Block $seqDisplay of $totalBlocks',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -364,16 +403,28 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
 
               // Transfer Metadata Card
               Surface(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Payload size', style: TextStyle(fontSize: 12, color: context.stockMuted)),
+                        Text(
+                          'Payload size',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.stockMuted,
+                          ),
+                        ),
                         Text(
                           '${(preparedPayload.uncompressedLength / 1024).toStringAsFixed(1)} KB (${preparedPayload.compressedData.length} bytes compressed)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -381,10 +432,20 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Session ID', style: TextStyle(fontSize: 12, color: context.stockMuted)),
+                        Text(
+                          'Session ID',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.stockMuted,
+                          ),
+                        ),
                         Text(
                           preparedPayload.sessionId,
-                          style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -392,10 +453,20 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Integrity Hash', style: TextStyle(fontSize: 12, color: context.stockMuted)),
+                        Text(
+                          'Integrity Hash',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.stockMuted,
+                          ),
+                        ),
                         Text(
                           EntryHasher.shortHash(preparedPayload.fullSha256),
-                          style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -407,7 +478,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
 
               // Photos in Stream Toggle Card
               Surface(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     const Icon(Icons.photo_library_outlined, size: 22),
@@ -418,14 +492,20 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         children: [
                           const Text(
                             'Include photos in QR stream',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 3),
                           Text(
                             includePhotos
                                 ? 'Photos included (${preparedPayload.totalBlocks} blocks). May take longer to scan.'
                                 : 'Off for maximum speed (${preparedPayload.totalBlocks} blocks). Fast and light.',
-                            style: TextStyle(fontSize: 11, color: context.stockMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.stockMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -442,7 +522,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
 
               // Multi-QR Parallel Layout Selector Card
               Surface(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -452,7 +535,10 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         SizedBox(width: 8),
                         Text(
                           'Parallel QR Layout',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -468,12 +554,18 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                       children: QrDisplayMode.values.map((mode) {
                         final isSelected = displayMode == mode;
                         return ChoiceChip(
-                          avatar: Icon(mode.icon, size: 16, color: isSelected ? Colors.white : context.stockInk),
+                          avatar: Icon(
+                            mode.icon,
+                            size: 16,
+                            color: isSelected ? Colors.white : context.stockInk,
+                          ),
                           label: Text(
                             mode.label,
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
                             ),
                           ),
                           selected: isSelected,
@@ -521,7 +613,13 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
   Widget _speedChip(String label, int ms) {
     final selected = intervalMs == ms;
     return ChoiceChip(
-      label: Text(label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+        ),
+      ),
       selected: selected,
       onSelected: (val) {
         if (val) _changeSpeed(ms);
