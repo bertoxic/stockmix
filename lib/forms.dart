@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'design.dart';
 import 'media_service.dart';
 import 'scanner_page.dart';
@@ -44,77 +45,223 @@ class _PhotoInputState extends State<PhotoInput> {
   }
 
   @override
-  Widget build(BuildContext context) => Surface(
-    color: linen,
-    child: Column(
-      children: [
-        if (widget.value != null) ...[
-          Builder(
-            builder: (_) {
-              final bytes = ProductImage.decodeBytes(widget.value);
-              if (bytes == null) return const SizedBox.shrink();
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.memory(
-                  bytes,
-                  height: 130,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              );
-            },
+  Widget build(BuildContext context) {
+    if (widget.value != null) {
+      final bytes = ProductImage.decodeBytes(widget.value);
+      if (bytes != null) {
+        final kb = (widget.value!.length * .75 / 1024).round();
+        return Container(
+          decoration: BoxDecoration(
+            color: context.stockPaper,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: context.stockLine),
           ),
-          const SizedBox(height: 10),
-        ],
-        Row(
-          children: [
-            Icon(
-              widget.value == null
-                  ? Icons.add_photo_alternate_outlined
-                  : Icons.check_circle_outline,
-              color: context.stockMuted,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                loading
-                    ? 'Compressing photo…'
-                    : widget.value == null
-                    ? 'Add a photo (optional)'
-                    : 'Photo attached · ${(widget.value!.length * .75 / 1024).round()} KB',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (widget.value != null)
-              IconButton(
-                tooltip: 'Remove photo',
-                onPressed: () => widget.onChanged(null),
-                icon: const Icon(Icons.close, size: 19),
-              ),
-          ],
-        ),
-        if (!loading)
-          Row(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextButton.icon(
-                onPressed: () => pick(ImageSource.camera),
-                icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                label: const Text('Camera'),
+              Stack(
+                children: [
+                  Image.memory(
+                    bytes,
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: 'Remove photo',
+                        iconSize: 18,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => widget.onChanged(null),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              TextButton.icon(
-                onPressed: () => pick(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined, size: 18),
-                label: const Text('Upload'),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 16,
+                      color: avocado,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Photo attached · $kb KB',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.stockInk,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: loading
+                          ? null
+                          : () => pick(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 15),
+                      label: const Text(
+                        'Camera',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: loading
+                          ? null
+                          : () => pick(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined, size: 15),
+                      label: const Text(
+                        'Upload',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        Text(
-          'Photos are resized and compressed before saving.',
-          style: TextStyle(fontSize: 11, color: context.stockMuted),
-        ),
-      ],
-    ),
-  );
+        );
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.stockLinen,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.stockLine),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Material(
+                  color: context.stockPaper,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: loading ? null : () => pick(ImageSource.camera),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 13,
+                        horizontal: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.stockLine),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_outlined,
+                            size: 19,
+                            color: context.stockInk,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Camera',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.stockInk,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Material(
+                  color: context.stockPaper,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: loading ? null : () => pick(ImageSource.gallery),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 13,
+                        horizontal: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.stockLine),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.photo_library_outlined,
+                            size: 19,
+                            color: context.stockInk,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Upload',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.stockInk,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (loading)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Reading photo & detecting text…',
+                  style: TextStyle(fontSize: 11, color: context.stockMuted),
+                ),
+              ],
+            )
+          else
+            Text(
+              'Add a photo (optional) · Auto-detects item text & barcodes',
+              style: TextStyle(fontSize: 11, color: context.stockMuted),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class ProductForm extends StatefulWidget {
@@ -144,10 +291,12 @@ class _ProductFormState extends State<ProductForm> {
       packSize,
       packPrice;
   String? photo;
+  DateTime? expiryDate;
   bool saving = false;
   bool sellsByPack = false;
   String defaultSellingUnit = 'base';
   List<String> nameSuggestions = [];
+  double _unitDragDistance = 0;
   @override
   void initState() {
     super.initState();
@@ -162,7 +311,7 @@ class _ProductFormState extends State<ProductForm> {
     quantity = TextEditingController(text: '0');
     threshold = TextEditingController(text: '${p?.threshold ?? 5}');
     code = TextEditingController(text: p?.barcode ?? widget.barcode);
-    category = TextEditingController(text: p?.category ?? 'General');
+    category = TextEditingController(text: p?.category ?? '');
     unit = TextEditingController(text: p?.unit ?? 'pcs');
     packSize = TextEditingController(text: '${p?.packSize ?? 10}');
     packPrice = TextEditingController(
@@ -173,6 +322,7 @@ class _ProductFormState extends State<ProductForm> {
     sellsByPack = p?.sellsByPack ?? false;
     defaultSellingUnit = p?.defaultSellingUnit ?? 'base';
     photo = p?.photo;
+    expiryDate = p?.expiryDate;
   }
 
   @override
@@ -209,8 +359,81 @@ class _ProductFormState extends State<ProductForm> {
     }
   }
 
+  bool get _isSellingAtLoss {
+    try {
+      final p = parseMoney(price.text);
+      final c = parseMoney(cost.text);
+      return c > p;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  List<String> get _categorySuggestions {
+    final query = category.text.trim().toLowerCase();
+    final all = <String>{};
+    for (final p in widget.store.products) {
+      final c = p.category.trim();
+      if (c.isNotEmpty) all.add(c);
+    }
+    const defaults = [
+      'General',
+      'Food & Drinks',
+      'Medicine',
+      'Cosmetics',
+      'Household',
+      'Groceries',
+      'Clothing',
+      'Electronics',
+    ];
+    for (final d in defaults) {
+      all.add(d);
+    }
+    if (query.isEmpty) {
+      return all.take(5).toList();
+    }
+    return all
+        .where(
+          (c) => c.toLowerCase().contains(query) && c.toLowerCase() != query,
+        )
+        .take(5)
+        .toList();
+  }
+
   Future<void> save() async {
     if (!form.currentState!.validate()) return;
+    if (_isSellingAtLoss) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: rust),
+              SizedBox(width: 8),
+              Text('Cost higher than price'),
+            ],
+          ),
+          content: const Text(
+            'The cost price is higher than the selling price, which means this item will be sold at a loss.\n\nAre you sure you want to save?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel & Edit'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: rust),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save anyway'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
     setState(() => saving = true);
     try {
       await widget.store.saveProduct(
@@ -227,6 +450,7 @@ class _ProductFormState extends State<ProductForm> {
           threshold: int.parse(threshold.text),
           unit: unit.text.trim().isEmpty ? 'pcs' : unit.text.trim(),
           photo: photo,
+          expiryDate: expiryDate,
           packSize: sellsByPack ? int.parse(packSize.text) : 1,
           packPrice: sellsByPack ? parseMoney(packPrice.text) : null,
           defaultSellingUnit: sellsByPack ? defaultSellingUnit : 'base',
@@ -246,6 +470,56 @@ class _ProductFormState extends State<ProductForm> {
     } finally {
       if (mounted) setState(() => saving = false);
     }
+  }
+
+  static const List<String> _commonUnits = [
+    'pcs',
+    'box',
+    'pack',
+    'bottle',
+    'can',
+    'sachet',
+    'bag',
+    'kg',
+    'g',
+    'ltr',
+    'card',
+    'strip',
+    'pair',
+    'roll',
+    'carton',
+    'tray',
+    'set',
+    'tube',
+  ];
+
+  List<String> get _availableUnits {
+    final list = <String>[..._commonUnits];
+    for (final p in widget.store.products) {
+      final u = p.unit.trim();
+      if (u.isNotEmpty &&
+          !list.any((e) => e.toLowerCase() == u.toLowerCase())) {
+        list.add(u);
+      }
+    }
+    return list;
+  }
+
+  void _cycleUnit(int direction) {
+    final units = _availableUnits;
+    if (units.isEmpty) return;
+    final current = unit.text.trim().toLowerCase();
+    final idx = units.indexWhere((u) => u.toLowerCase() == current);
+    int nextIdx;
+    if (idx == -1) {
+      nextIdx = direction > 0 ? 0 : units.length - 1;
+    } else {
+      nextIdx = (idx + direction) % units.length;
+      if (nextIdx < 0) nextIdx += units.length;
+    }
+    setState(() {
+      unit.text = units[nextIdx];
+    });
   }
 
   @override
@@ -317,7 +591,10 @@ class _ProductFormState extends State<ProductForm> {
                       onTap: () => setState(() => nameSuggestions.clear()),
                       child: Text(
                         'Dismiss',
-                        style: TextStyle(fontSize: 11, color: context.stockMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.stockMuted,
+                        ),
                       ),
                     ),
                   ],
@@ -371,6 +648,7 @@ class _ProductFormState extends State<ProductForm> {
                   Expanded(
                     child: TextFormField(
                       controller: price,
+                      onChanged: (_) => setState(() {}),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -384,6 +662,7 @@ class _ProductFormState extends State<ProductForm> {
                   Expanded(
                     child: TextFormField(
                       controller: cost,
+                      onChanged: (_) => setState(() {}),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -395,6 +674,36 @@ class _ProductFormState extends State<ProductForm> {
                   ),
                 ],
               ),
+              if (_isSellingAtLoss) ...[
+                const SizedBox(height: 10),
+                Surface(
+                  color: context.stockRust.withValues(alpha: 0.1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: context.stockRust,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Warning: Cost price is higher than selling price (selling at a loss).',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: context.stockRust,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               if (widget.product == null) ...[
                 TextFormField(
@@ -406,21 +715,94 @@ class _ProductFormState extends State<ProductForm> {
                 const SizedBox(height: 20),
               ],
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: category,
-                      maxLength: 40,
-                      decoration: const InputDecoration(labelText: 'Category'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: category,
+                          maxLength: 40,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                          ),
+                        ),
+                        if (_categorySuggestions.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              for (final cat in _categorySuggestions)
+                                ActionChip(
+                                  avatar: const Icon(
+                                    Icons.label_outline,
+                                    size: 12,
+                                  ),
+                                  label: Text(
+                                    cat,
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    setState(() {
+                                      category.text = cat;
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextFormField(
-                      controller: unit,
-                      maxLength: 12,
-                      decoration: const InputDecoration(
-                        labelText: 'Unit (pcs, box…)',
+                    child: Listener(
+                      key: const Key('unit_field_listener'),
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (e) {
+                        _unitDragDistance = 0;
+                      },
+                      onPointerMove: (e) {
+                        _unitDragDistance += e.delta.dx;
+                      },
+                      onPointerUp: (e) {
+                        if (_unitDragDistance < -20) {
+                          _cycleUnit(1);
+                        } else if (_unitDragDistance > 20) {
+                          _cycleUnit(-1);
+                        }
+                        _unitDragDistance = 0;
+                      },
+                      child: TextFormField(
+                        key: const Key('unit_field'),
+                        controller: unit,
+                        maxLength: 12,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          labelText: 'Unit (pcs, box…)',
+                          prefixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.chevron_left_rounded,
+                              size: 20,
+                            ),
+                            tooltip: 'Previous unit',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _cycleUnit(-1),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                            ),
+                            tooltip: 'Next unit',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _cycleUnit(1),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -517,6 +899,48 @@ class _ProductFormState extends State<ProductForm> {
                 onPressed: saving ? null : save,
                 icon: const Icon(Icons.check),
                 label: Text(saving ? 'Saving…' : 'Save item'),
+              ),
+              const SizedBox(height: 12),
+              ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: const Text('Advanced'),
+                subtitle: Text(
+                  expiryDate == null
+                      ? 'Add optional item details'
+                      : 'Expires ${DateFormat('d MMM yyyy').format(expiryDate!)}',
+                  style: TextStyle(fontSize: 11, color: context.stockMuted),
+                ),
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    leading: const Icon(Icons.event_outlined),
+                    title: const Text('Expiry date'),
+                    subtitle: Text(
+                      expiryDate == null
+                          ? 'Not set'
+                          : DateFormat('EEE, d MMM yyyy').format(expiryDate!),
+                    ),
+                    trailing: expiryDate == null
+                        ? const Icon(Icons.chevron_right)
+                        : IconButton(
+                            tooltip: 'Clear expiry date',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() => expiryDate = null),
+                          ),
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final selected = await showDatePicker(
+                        context: context,
+                        initialDate: expiryDate ?? now,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(now.year + 100),
+                      );
+                      if (selected != null && mounted) {
+                        setState(() => expiryDate = selected);
+                      }
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
             ],

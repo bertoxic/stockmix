@@ -56,6 +56,7 @@ class Product {
   final String id, name, category, barcode, unit;
   final int price, cost, opening, threshold;
   final String? photo;
+  final DateTime? expiryDate;
 
   /// Inventory is always counted in [unit], the product's base unit.
   ///
@@ -75,6 +76,7 @@ class Product {
     required this.threshold,
     this.unit = 'pcs',
     this.photo,
+    this.expiryDate,
     this.packSize = 1,
     this.packPrice,
     this.defaultSellingUnit = 'base',
@@ -106,6 +108,7 @@ class Product {
     'threshold': threshold,
     'unit': unit,
     'photo': photo,
+    'expiryDate': expiryDate?.toIso8601String(),
     'packSize': packSize,
     'packPrice': packPrice,
     'defaultSellingUnit': defaultSellingUnit,
@@ -121,6 +124,9 @@ class Product {
     threshold: j['threshold'],
     unit: j['unit'] ?? 'pcs',
     photo: j['photo'],
+    expiryDate: j['expiryDate'] is String
+        ? DateTime.tryParse(j['expiryDate'] as String)
+        : null,
     packSize: j['packSize'] is int ? j['packSize'] as int : 1,
     packPrice: j['packPrice'] is int ? j['packPrice'] as int : null,
     defaultSellingUnit: j['defaultSellingUnit'] == 'pack' ? 'pack' : 'base',
@@ -553,8 +559,7 @@ class StockStore extends ChangeNotifier {
     final caseMatch = _movements
         .where(
           (m) =>
-              m.reference.toUpperCase() == upper ||
-              m.id.toUpperCase() == upper,
+              m.reference.toUpperCase() == upper || m.id.toUpperCase() == upper,
         )
         .toList();
     if (caseMatch.isNotEmpty) return caseMatch;
@@ -1383,6 +1388,7 @@ class StockStore extends ChangeNotifier {
               threshold: existing.threshold,
               unit: existing.unit,
               photo: p.photo,
+              expiryDate: existing.expiryDate,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,
@@ -1448,6 +1454,7 @@ class StockStore extends ChangeNotifier {
               threshold: existing.threshold,
               unit: existing.unit,
               photo: p.photo,
+              expiryDate: existing.expiryDate,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,
@@ -1528,6 +1535,7 @@ class StockStore extends ChangeNotifier {
       threshold: product.threshold,
       unit: product.unit,
       photo: product.photo,
+      expiryDate: product.expiryDate,
       packSize: product.packSize,
       packPrice: product.packPrice == null
           ? null
@@ -1608,6 +1616,7 @@ class StockStore extends ChangeNotifier {
               threshold: existing.threshold,
               unit: existing.unit,
               photo: p.photo,
+              expiryDate: existing.expiryDate,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,

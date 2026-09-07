@@ -34,7 +34,7 @@ void main() {
       expect(find.text('Ceramic everyday mug'), findsOneWidget);
       await tester.tap(find.text('Ceramic everyday mug'));
       await tester.pumpAndSettle();
-      expect(find.text('Selling price'.toUpperCase()), findsOneWidget);
+      expect(find.text('Record a sale'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.ensureVisible(find.text('Record a sale'));
       await tester.pumpAndSettle();
@@ -573,7 +573,7 @@ void main() {
       expect(find.text('Store & App Settings'), findsOneWidget);
       expect(find.text('Scan audio tone'), findsOneWidget);
       expect(find.text('Haptic vibration'), findsOneWidget);
-      expect(find.text('Calm Paper (Default)'), findsOneWidget);
+      expect(find.text('Light Theme (Default)'), findsOneWidget);
     },
   );
 }

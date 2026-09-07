@@ -77,6 +77,8 @@ class _StockShellState extends State<StockShell> {
   bool lowOnly = false;
   DateTime day = DateTime.now();
   int recordsMode = 0;
+  // Sales and customer refunds are the primary day-to-day view.
+  int dailyActivityFilter = 1;
   int insightsDays = 7;
   bool showAllRecords = false;
   bool showAllInventory = false;
@@ -129,7 +131,11 @@ class _StockShellState extends State<StockShell> {
               children: [
                 Text(
                   'Set up your store name and local currency. You can change this at any time in settings without affecting your product records.',
-                  style: TextStyle(color: context.stockMuted, fontSize: 13, height: 1.4),
+                  style: TextStyle(
+                    color: context.stockMuted,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 TextField(
@@ -482,7 +488,11 @@ class _StockShellState extends State<StockShell> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.offline_pin_outlined, color: context.stockMuted, size: 23),
+                Icon(
+                  Icons.offline_pin_outlined,
+                  color: context.stockMuted,
+                  size: 23,
+                ),
                 const SizedBox(height: 10),
                 const Text(
                   'Your shop. In your pocket.',
@@ -491,7 +501,11 @@ class _StockShellState extends State<StockShell> {
                 const SizedBox(height: 7),
                 Text(
                   'Work offline. Share when you’re ready.',
-                  style: TextStyle(color: context.stockMuted, fontSize: 11, height: 1.6),
+                  style: TextStyle(
+                    color: context.stockMuted,
+                    fontSize: 11,
+                    height: 1.6,
+                  ),
                 ),
               ],
             ),
@@ -499,7 +513,11 @@ class _StockShellState extends State<StockShell> {
           const SizedBox(height: 22),
           Text(
             'STOCKMIX  /  01',
-            style: TextStyle(fontSize: 9, letterSpacing: 2, color: context.stockMuted),
+            style: TextStyle(
+              fontSize: 9,
+              letterSpacing: 2,
+              color: context.stockMuted,
+            ),
           ),
         ],
       ),
@@ -515,7 +533,11 @@ class _StockShellState extends State<StockShell> {
             const SizedBox(height: 9),
             Row(
               children: [
-                Icon(Icons.storefront_outlined, size: 17, color: context.stockMuted),
+                Icon(
+                  Icons.storefront_outlined,
+                  size: 17,
+                  color: context.stockMuted,
+                ),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
@@ -576,8 +598,11 @@ class _StockShellState extends State<StockShell> {
                       color: avocado,
                       borderRadius: BorderRadius.circular(19),
                     ),
-                    child: Icon(Icons.qr_code_scanner, size: 27,
-                      color: context.isStockDark ? plum : null),
+                    child: Icon(
+                      Icons.qr_code_scanner,
+                      size: 27,
+                      color: context.isStockDark ? plum : null,
+                    ),
                   ),
                 ),
               ),
@@ -598,7 +623,11 @@ class _StockShellState extends State<StockShell> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 23, color: tab == value ? context.stockInk : cement),
+            Icon(
+              icon,
+              size: 23,
+              color: tab == value ? context.stockInk : cement,
+            ),
             const SizedBox(height: 5),
             Text(
               label,
@@ -769,11 +798,7 @@ class _StockShellState extends State<StockShell> {
                     color: avocado,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.storefront_outlined,
-                    color: plum,
-                    size: 24,
-                  ),
+                  child: Icon(Icons.storefront_outlined, color: plum, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -790,7 +815,10 @@ class _StockShellState extends State<StockShell> {
                       const SizedBox(height: 3),
                       Text(
                         'Store currency is currently ${store.currency}. Set your preferred store currency.',
-                        style: TextStyle(color: context.stockMuted, fontSize: 12),
+                        style: TextStyle(
+                          color: context.stockMuted,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -1001,7 +1029,10 @@ class _StockShellState extends State<StockShell> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: context.stockMuted)),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: context.stockMuted),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1018,7 +1049,10 @@ class _StockShellState extends State<StockShell> {
                     Flexible(
                       child: Text(
                         detail,
-                        style: TextStyle(fontSize: 10, color: context.stockMuted),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: context.stockMuted,
+                        ),
                       ),
                     ),
                   ],
@@ -1104,8 +1138,11 @@ class _StockShellState extends State<StockShell> {
           padding: const EdgeInsets.symmetric(vertical: 21, horizontal: 4),
           child: Column(
             children: [
-              Icon(icon, size: 25,
-                color: context.isStockDark && color == avocado ? plum : null),
+              Icon(
+                icon,
+                size: 25,
+                color: context.isStockDark && color == avocado ? plum : null,
+              ),
               const SizedBox(height: 10),
               Text(
                 label,
@@ -1168,7 +1205,9 @@ class _StockShellState extends State<StockShell> {
               Text(
                 '${store.stockLabel(p)} left',
                 style: TextStyle(
-                  color: store.stock(p) <= p.threshold ? context.stockRust : context.stockMuted,
+                  color: store.stock(p) <= p.threshold
+                      ? context.stockRust
+                      : context.stockMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1481,18 +1520,29 @@ class _StockShellState extends State<StockShell> {
 
   List<Widget> records() {
     final movementsOnDay = store.onDay(day).reversed.toList();
+    final filteredMovements = switch (dailyActivityFilter) {
+      1 =>
+        movementsOnDay
+            .where((m) => m.type == 'Sale' || m.type.startsWith('Return'))
+            .toList(),
+      2 =>
+        movementsOnDay
+            .where((m) => m.type != 'Sale' && !m.type.startsWith('Return'))
+            .toList(),
+      _ => movementsOnDay,
+    };
     // Keep each customer purchase and each related return together. A return
     // produces restock and refund movements per item, but staff should see one
     // customer-return entry instead of a separate row for every movement.
     final activityItems = <dynamic>[];
     final processedRefs = <String>{};
 
-    for (final m in movementsOnDay) {
+    for (final m in filteredMovements) {
       if (m.type == 'Sale' && m.reference.isNotEmpty) {
         final groupKey = 'sale:${m.reference}';
         if (!processedRefs.contains(groupKey)) {
           processedRefs.add(groupKey);
-          final saleGroup = movementsOnDay
+          final saleGroup = filteredMovements
               .where(
                 (other) =>
                     other.type == 'Sale' && other.reference == m.reference,
@@ -1511,7 +1561,7 @@ class _StockShellState extends State<StockShell> {
         if (!processedRefs.contains(groupKey)) {
           processedRefs.add(groupKey);
           activityItems.add(
-            movementsOnDay
+            filteredMovements
                 .where(
                   (other) =>
                       other.type.startsWith('Return') &&
@@ -1617,6 +1667,19 @@ class _StockShellState extends State<StockShell> {
           ),
         ),
         const SizedBox(height: 18),
+        SegmentedButton<int>(
+          segments: const [
+            ButtonSegment(value: 0, label: Text('All')),
+            ButtonSegment(value: 1, label: Text('Sales & refunds')),
+            ButtonSegment(value: 2, label: Text('Stock')),
+          ],
+          selected: {dailyActivityFilter},
+          onSelectionChanged: (selection) => setState(() {
+            dailyActivityFilter = selection.first;
+            showAllRecords = false;
+          }),
+        ),
+        const SizedBox(height: 18),
         Surface(
           color: avocado,
           child: Row(
@@ -1629,7 +1692,9 @@ class _StockShellState extends State<StockShell> {
                     const SizedBox(height: 10),
                     Text(
                       money(store, store.revenue(day)),
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(color: plum),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineLarge?.copyWith(color: plum),
                     ),
                   ],
                 ),
@@ -1656,8 +1721,7 @@ class _StockShellState extends State<StockShell> {
             child: EmptyState(
               icon: Icons.receipt_long_outlined,
               title: 'A quiet page so far.',
-              subtitle:
-                  'Sales, receipts, and stock adjustments for this day will appear here.',
+              subtitle: 'No activity matches this filter for the selected day.',
             ),
           )
         else ...[
@@ -1811,12 +1875,19 @@ class _StockShellState extends State<StockShell> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, size: 16, color: context.stockMuted),
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: context.stockMuted,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             '$missingCost sales lacked a cost price. Estimated profit calculates using known costs.',
-                            style: TextStyle(fontSize: 11, color: context.stockMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.stockMuted,
+                            ),
                           ),
                         ),
                       ],
@@ -1853,7 +1924,9 @@ class _StockShellState extends State<StockShell> {
                                   height: 28,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: i == 0 ? avocado : context.stockLinen,
+                                    color: i == 0
+                                        ? avocado
+                                        : context.stockLinen,
                                     shape: BoxShape.circle,
                                   ),
                                   child: Text(
@@ -2132,7 +2205,10 @@ class _StockShellState extends State<StockShell> {
     ),
     subtitle: Padding(
       padding: const EdgeInsets.only(top: 5),
-      child: Text(subtitle, style: TextStyle(color: context.stockMuted, fontSize: 11)),
+      child: Text(
+        subtitle,
+        style: TextStyle(color: context.stockMuted, fontSize: 11),
+      ),
     ),
     trailing: const Icon(Icons.chevron_right, color: cement, size: 19),
     onTap: action,
@@ -2238,7 +2314,11 @@ class DailyReturnGroupTile extends StatelessWidget {
               color: rust.withValues(alpha: .14),
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(Icons.replay_outlined, size: 21, color: context.stockRust),
+            child: Icon(
+              Icons.replay_outlined,
+              size: 21,
+              color: context.stockRust,
+            ),
           ),
           title: Text(
             itemNames,
@@ -2539,15 +2619,9 @@ Future<void> showSaleTransactionDetails(
                     IconButton(
                       tooltip: 'Process return for ${m.name}',
                       onPressed: store.returnableQuantity(m) > 0
-                          ? () => Navigator.pop(
-                              sheetCtx,
-                              'return:${m.id}',
-                            )
+                          ? () => Navigator.pop(sheetCtx, 'return:${m.id}')
                           : null,
-                      icon: const Icon(
-                        Icons.replay_outlined,
-                        size: 19,
-                      ),
+                      icon: const Icon(Icons.replay_outlined, size: 19),
                     ),
                   ],
                 ),
@@ -2560,10 +2634,7 @@ Future<void> showSaleTransactionDetails(
               children: [
                 const Text(
                   'Total paid',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 Text(
                   money(store, totalMoney),
@@ -2587,10 +2658,7 @@ Future<void> showSaleTransactionDetails(
                 backgroundColor: rust,
                 foregroundColor: paper,
               ),
-              onPressed:
-                  saleGroup.any(
-                    (m) => store.returnableQuantity(m) > 0,
-                  )
+              onPressed: saleGroup.any((m) => store.returnableQuantity(m) > 0)
                   ? () => Navigator.pop(sheetCtx, 'returnAll')
                   : null,
               icon: const Icon(Icons.replay_circle_filled_outlined),
@@ -2601,12 +2669,8 @@ Future<void> showSaleTransactionDetails(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        Navigator.pop(sheetCtx, 'receipt'),
-                    icon: const Icon(
-                      Icons.receipt_long_outlined,
-                      size: 18,
-                    ),
+                    onPressed: () => Navigator.pop(sheetCtx, 'receipt'),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
                     label: const Text('Share receipt'),
                   ),
                 ),
@@ -2630,10 +2694,8 @@ Future<void> showSaleTransactionDetails(
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ReceiptInvoicePage.fromMovement(
-          store: store,
-          movement: first,
-        ),
+        builder: (_) =>
+            ReceiptInvoicePage.fromMovement(store: store, movement: first),
       ),
     );
   } else if (action == 'returnAll') {
@@ -2903,7 +2965,10 @@ class MovementTile extends StatelessWidget {
                         const SizedBox(height: 18),
                         SelectableText(
                           'Reference: ${m.reference}',
-                          style: TextStyle(fontSize: 10, color: context.stockMuted),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: context.stockMuted,
+                          ),
                         ),
                       ],
                       if (m.type == 'Sale') ...[
@@ -3176,6 +3241,139 @@ class ProductPage extends StatelessWidget {
         }
       }
 
+      void showImagePopup() {
+        final bytes = ProductImage.decodeBytes(p.photo);
+        showDialog<void>(
+          context: context,
+          builder: (dialogCtx) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 500,
+                  maxHeight: 600,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: dialogCtx.stockPaper,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 10, 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    p.category,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: dialogCtx.stockMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(dialogCtx),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Flexible(
+                        child: bytes != null
+                            ? InteractiveViewer(
+                                clipBehavior: Clip.antiAlias,
+                                maxScale: 4.0,
+                                child: Image.memory(
+                                  bytes,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) => Container(
+                                    height: 240,
+                                    color: dialogCtx.stockLinen,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 48,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                height: 240,
+                                color: dialogCtx.stockLinen,
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  categoryIcon(p.category),
+                                  size: 72,
+                                  color: dialogCtx.stockMuted,
+                                ),
+                              ),
+                      ),
+                      if (bytes != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.pinch_outlined,
+                                size: 15,
+                                color: dialogCtx.stockMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Pinch or scroll to zoom · ${(p.photo!.length * .75 / 1024).round()} KB',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: dialogCtx.stockMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
       return Scaffold(
         appBar: AppBar(
           title: const Text('Item details'),
@@ -3205,7 +3403,36 @@ class ProductPage extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          ProductImage(p, size: 110),
+                          Tooltip(
+                            message: 'Tap to view full image',
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: showImagePopup,
+                              child: Stack(
+                                children: [
+                                  ProductImage(p, size: 110),
+                                  Positioned(
+                                    right: 6,
+                                    bottom: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.fullscreen_rounded,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                           const Spacer(),
                           Tag(
                             qty == 0
@@ -3266,19 +3493,29 @@ class ProductPage extends StatelessWidget {
                       const SizedBox(height: 18),
                       Text(
                         'Cost: ${money(store, p.cost)}  ·  Low-stock alert: ${p.threshold}',
-                        style: TextStyle(fontSize: 12, color: context.stockMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.stockMuted,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       if (p.sellsByPack) ...[
                         Text(
                           'Pack: ${p.packSize} ${p.unit} · ${money(store, p.packPrice!)} · defaults to ${p.defaultUnit.name}',
-                          style: TextStyle(fontSize: 12, color: context.stockMuted),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.stockMuted,
+                          ),
                         ),
                         const SizedBox(height: 12),
                       ],
                       Row(
                         children: [
-                          Icon(Icons.qr_code, size: 20, color: context.stockMuted),
+                          Icon(
+                            Icons.qr_code,
+                            size: 20,
+                            color: context.stockMuted,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: SelectableText(
