@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +30,10 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
   String? lastCode;
   DateTime? lastScanTime;
 
+  Timer? _uiThrottleTimer;
+  DateTime _lastUiUpdateTime = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastHapticTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   bool get cameraSupported =>
       kIsWeb ||
       [
@@ -44,11 +47,13 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
     super.initState();
     controller = MobileScannerController(
       detectionSpeed: DetectionSpeed.unrestricted,
+      formats: const [BarcodeFormat.qrCode],
     );
   }
 
   @override
   void dispose() {
+    _uiThrottleTimer?.cancel();
     controller.dispose();
     super.dispose();
   }
@@ -59,10 +64,39 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
     final decoded = barcode.rawDecodedBytes;
     if (decoded is DecodedBarcodeBytes) return decoded.bytes;
     if (decoded is DecodedVisionBarcodeBytes) return decoded.bytes;
-    return barcode.rawBytes;
+    return null;
+  }
+
+  void _triggerHaptic() {
+    final now = DateTime.now();
+    if (now.difference(_lastHapticTime).inMilliseconds >= 80) {
+      _lastHapticTime = now;
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  void _scheduleThrottledUiUpdate() {
+    if (finished) return;
+    final now = DateTime.now();
+    final elapsed = now.difference(_lastUiUpdateTime).inMilliseconds;
+    if (elapsed >= 150) {
+      _lastUiUpdateTime = now;
+      _uiThrottleTimer?.cancel();
+      _uiThrottleTimer = null;
+      if (mounted) setState(() {});
+    } else {
+      _uiThrottleTimer ??= Timer(Duration(milliseconds: 150 - elapsed), () {
+        _uiThrottleTimer = null;
+        if (mounted && !finished) {
+          _lastUiUpdateTime = DateTime.now();
+          setState(() {});
+        }
+      });
+    }
   }
 
   void _finishIfComplete() {
+    _uiThrottleTimer?.cancel();
     if (decoder.isComplete && !finished) _handleCompletion();
   }
 
@@ -73,6 +107,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
     // Clean up codes older than 120ms
     _recentlySeenCodes.removeWhere((_, time) => now.difference(time).inMilliseconds > 120);
 
+    var newlyResolved = false;
     for (final barcode in capture.barcodes) {
       final bytes = _decodedBytes(barcode);
       if (bytes != null && StreamFrame.isBinaryFrame(bytes)) {
@@ -80,21 +115,32 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
         if (_recentlySeenCodes.containsKey(key)) continue;
         _recentlySeenCodes[key] = now;
 
-        final beforeResolved = decoder.stats.resolvedBlocks;
+        final beforeResolved = decoder.resolvedCount;
         decoder.processRawBytes(bytes);
-        final afterResolved = decoder.stats.resolvedBlocks;
-        if (mounted) setState(() {});
-        if (afterResolved > beforeResolved) HapticFeedback.selectionClick();
-        _finishIfComplete();
-        if (finished) break;
-        continue;
-      }
+        final afterResolved = decoder.resolvedCount;
+        if (afterResolved > beforeResolved) {
+          newlyResolved = true;
+        }
 
+        if (decoder.isComplete) {
+          _finishIfComplete();
+          break;
+        }
+      }
+    }
+
+    if (newlyResolved) {
+      _triggerHaptic();
+    }
+
+    if (!finished) {
+      _scheduleThrottledUiUpdate();
     }
   }
 
   Future<void> _handleCompletion() async {
     finished = true;
+    _uiThrottleTimer?.cancel();
 
     // Verify SHA-256 integrity and decompress
     final result = decoder.verifyAndDecompress();
@@ -134,6 +180,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
   }
 
   void _resetScanner() {
+    _uiThrottleTimer?.cancel();
     setState(() {
       finished = false;
       errorMessage = null;
@@ -203,11 +250,11 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                             ),
                           ),
                         ),
-                      // Target Box
+                      // Target Box (Wide rectangle matching dual QR code layout)
                       Center(
                         child: Container(
-                          width: 200,
-                          height: 180,
+                          width: 290,
+                          height: 145,
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: stats.isComplete ? avocado : Colors.white70,
@@ -215,6 +262,18 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                             ),
                             borderRadius: BorderRadius.circular(18),
                           ),
+                          child: stats.totalBlocks == 0
+                              ? Center(
+                                  child: Text(
+                                    'Align dual QR codes in frame',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                              : null,
                         ),
                       ),
                     ],
@@ -313,7 +372,7 @@ class _QrStreamReceiverPageState extends State<QrStreamReceiverPage> {
                         spacing: 5,
                         runSpacing: 5,
                         children: List.generate(stats.totalBlocks, (index) {
-                          final resolved = stats.blockStatus[index];
+                          final resolved = decoder.isBlockResolved(index);
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             width: 22,

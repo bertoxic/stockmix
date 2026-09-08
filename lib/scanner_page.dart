@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/rendering.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'design.dart';
 import 'forms.dart';
 import 'pages.dart';
@@ -195,6 +203,9 @@ class _ScannerPageState extends State<ScannerPage> {
     }
     setState(() {
       cart.add(product, unit, quantity: quantity);
+      cart.moveToFront(
+        '${product.id}::${unit.name}::${unit.multiplier}::${unit.price}',
+      );
       unrecognizedCode = null;
       scanPulsing = true;
     });
@@ -311,33 +322,30 @@ class _ScannerPageState extends State<ScannerPage> {
     if (!accepted || !mounted) return;
 
     try {
-      await store.checkoutSale(cart.copy(), '');
-      if (!mounted) return;
+      final soldCart = cart.copy();
       final recordedTotal = total;
+      final saleTime = DateTime.now();
+      final receiptRef = await store.checkoutSale(soldCart, '');
+      if (!mounted) return;
+
       setState(() => cart.clear());
       _notifyCartChanged();
 
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          icon: const Icon(
-            Icons.check_circle_outline,
-            size: 48,
-            color: Color(0xFF737638),
-          ),
-          title: const Text('Sale recorded.'),
-          content: Text(
-            '${money(store, recordedTotal)} saved on this device. Your stock is up to date.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _popWithCart();
-              },
-              child: const Text('Done'),
-            ),
-          ],
+        barrierDismissible: false,
+        builder: (dialogCtx) => _ReceiptDialog(
+          store: store,
+          receiptRef: receiptRef,
+          cart: soldCart,
+          total: recordedTotal,
+          date: saleTime,
+          onNextSale: () {
+            // Stay in scanner with empty cart, ready for next items
+          },
+          onDone: () {
+            _popWithCart();
+          },
         ),
       );
     } catch (e) {
@@ -1223,4 +1231,562 @@ class _UnitChoiceButton extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _ReceiptDialog extends StatefulWidget {
+  final StockStore store;
+  final String receiptRef;
+  final SaleCart cart;
+  final int total;
+  final DateTime date;
+  final VoidCallback onNextSale;
+  final VoidCallback onDone;
+
+  const _ReceiptDialog({
+    required this.store,
+    required this.receiptRef,
+    required this.cart,
+    required this.total,
+    required this.date,
+    required this.onNextSale,
+    required this.onDone,
+  });
+
+  @override
+  State<_ReceiptDialog> createState() => _ReceiptDialogState();
+}
+
+class _ReceiptDialogState extends State<_ReceiptDialog> {
+  final GlobalKey _receiptBoundaryKey = GlobalKey();
+  bool _isProcessing = false;
+
+  String get _shortRef => widget.receiptRef.length > 8
+      ? widget.receiptRef.substring(0, 8).toUpperCase()
+      : widget.receiptRef.toUpperCase();
+
+  Future<Uint8List?> _captureReceiptPng() async {
+    try {
+      final boundary =
+          _receiptBoundaryKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 4.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Error capturing receipt PNG: $e');
+      return null;
+    }
+  }
+
+  Future<void> _shareReceipt() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      final bytes = await _captureReceiptPng();
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) showMessage(context, 'Unable to capture receipt image.');
+        return;
+      }
+
+      final filename = 'receipt-$_shortRef.png';
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/$filename');
+      await tempFile.writeAsBytes(bytes);
+
+      if (!mounted) return;
+
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : null;
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(tempFile.path, mimeType: 'image/png', name: filename)],
+          fileNameOverrides: [filename],
+          subject: 'Receipt #$_shortRef from ${widget.store.shop}',
+          title: 'Share receipt',
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _downloadReceipt() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      final bytes = await _captureReceiptPng();
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) showMessage(context, 'Unable to capture receipt image.');
+        return;
+      }
+
+      final filename = 'receipt-$_shortRef.png';
+      final saved = await FilePicker.saveFile(
+        fileName: filename,
+        bytes: bytes,
+        type: FileType.image,
+        allowedExtensions: ['png'],
+        mimeType: 'image/png',
+        dialogTitle: 'Save receipt image to device',
+      );
+
+      if (saved != null && mounted) {
+        showMessage(context, 'Receipt saved to device.');
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final cart = widget.cart;
+    final totalUnits = cart.lines.fold(0, (sum, line) => sum + line.quantity);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E201E) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 28,
+                spreadRadius: 2,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header title bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: avocado.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF5E6B34),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Sale Recorded!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Stock deducted & receipt ready',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.stockMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onNextSale();
+                      },
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Scrollable receipt body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: RepaintBoundary(
+                    key: _receiptBoundaryKey,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: context.stockPaper,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.stockLine),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Receipt header
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                            child: Column(
+                              children: [
+                                Text(
+                                  store.shop.toUpperCase(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sales Receipt',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.stockMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Tag('#$_shortRef', color: context.stockInk),
+                                    const SizedBox(width: 6),
+                                    Tag('PAID · CASH', color: avocado),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  DateFormat(
+                                    'd MMM yyyy, h:mm a',
+                                  ).format(widget.date),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.stockMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Dotted separator
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: List.generate(
+                                24,
+                                (i) => Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: i.isEven
+                                        ? context.stockLine
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Item list
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Column(
+                              children: [
+                                for (final line in cart.lines) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                store
+                                                    .product(line.productId)
+                                                    .name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                '${line.quantity} ${line.unitName} @ ${money(store, line.unitPrice)}',
+                                                style: TextStyle(
+                                                  fontSize: 10.5,
+                                                  color: context.stockMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          money(store, line.total),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+                          // Dotted separator
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: List.generate(
+                                24,
+                                (i) => Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: i.isEven
+                                        ? context.stockLine
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Total summary
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Items count',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: context.stockMuted,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$totalUnits units',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'TOTAL PAID',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      money(store, widget.total),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 17,
+                                        color: context.stockInk,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Receipt QR verification footer
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.stockLinen.withValues(alpha: 0.6),
+                              borderRadius: const BorderRadius.vertical(
+                                bottom: Radius.circular(16),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: context.stockLine,
+                                    ),
+                                  ),
+                                  child: QrImageView(
+                                    data: 'SMX:REC:${widget.receiptRef}',
+                                    size: 44,
+                                    padding: EdgeInsets.zero,
+                                    version: QrVersions.auto,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Official Verification QR',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Scan anytime with app for instant returns & warranty lookup.',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: context.stockMuted,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const Divider(height: 1),
+
+              // Action buttons footer
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 42),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                            ),
+                            onPressed: _isProcessing ? null : _downloadReceipt,
+                            icon: const Icon(Icons.download_rounded, size: 16),
+                            label: const Text(
+                              'Save receipt',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 42),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                            ),
+                            onPressed: _isProcessing ? null : _shareReceipt,
+                            icon: const Icon(Icons.share_outlined, size: 16),
+                            label: const Text(
+                              'Share receipt',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: context.stockMuted,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            widget.onDone();
+                          },
+                          child: const Text('Done'),
+                        ),
+                        const Spacer(),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: avocado,
+                            foregroundColor: plum,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            minimumSize: const Size(0, 42),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            widget.onNextSale();
+                          },
+                          icon: const Icon(Icons.qr_code_scanner, size: 16),
+                          label: const Text(
+                            'Next sale',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

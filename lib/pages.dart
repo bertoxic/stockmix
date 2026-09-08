@@ -83,6 +83,7 @@ class _StockShellState extends State<StockShell> {
   int insightsDays = 7;
   bool showAllRecords = false;
   bool showAllInventory = false;
+  bool hideTodaySales = false;
   StockStore get store => widget.store;
 
   @override
@@ -760,6 +761,21 @@ class _StockShellState extends State<StockShell> {
               const Expanded(
                 child: Eyebrow('Today’s sales', color: Color(0xFFCCC5CB)),
               ),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => setState(() => hideTodaySales = !hideTodaySales),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Icon(
+                    hideTodaySales
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 16,
+                    color: const Color(0xFFCCC5CB),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
@@ -785,21 +801,27 @@ class _StockShellState extends State<StockShell> {
             ],
           ),
           const SizedBox(height: 16),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              money(store, store.revenue(today)),
-              style: const TextStyle(
-                color: paper,
-                fontSize: 43,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -2,
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => hideTodaySales = !hideTodaySales),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                hideTodaySales ? '••••••••' : money(store, store.revenue(today)),
+                style: const TextStyle(
+                  color: paper,
+                  fontSize: 43,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -2,
+                ),
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            '$transactions ${transactions == 1 ? 'sale' : 'sales'} recorded  ·  ${sales.fold(0, (n, m) => n - m.delta)} items sold',
+            hideTodaySales
+                ? 'Amount hidden  ·  Tap to reveal'
+                : '$transactions ${transactions == 1 ? 'sale' : 'sales'} recorded  ·  ${sales.fold(0, (n, m) => n - m.delta)} items sold',
             style: const TextStyle(color: Color(0xFFCFC6CD), fontSize: 12),
           ),
           const SizedBox(height: 22),

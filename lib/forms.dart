@@ -29,9 +29,11 @@ class _PhotoInputState extends State<PhotoInput> {
         final result = await pickPhotoWithText(source);
         if (result != null && mounted) {
           widget.onChanged(result.base64Image);
-          if (result.extractedText.isNotEmpty) {
-            widget.onTextExtracted!(result.extractedText);
-          }
+          result.extractedText.then((lines) {
+            if (mounted && lines.isNotEmpty) {
+              widget.onTextExtracted!(lines);
+            }
+          });
         }
       } else {
         final image = await pickPhoto(source);
@@ -157,7 +159,7 @@ class _PhotoInputState extends State<PhotoInput> {
             children: [
               Expanded(
                 child: Material(
-                  color: context.stockPaper,
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
@@ -197,7 +199,7 @@ class _PhotoInputState extends State<PhotoInput> {
               const SizedBox(width: 10),
               Expanded(
                 child: Material(
-                  color: context.stockPaper,
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
@@ -293,6 +295,7 @@ class _ProductFormState extends State<ProductForm> {
   late final FocusNode categoryFocus;
   String? photo;
   DateTime? expiryDate;
+  String? selectedLabel;
   bool saving = false;
   bool sellsByPack = false;
   String defaultSellingUnit = 'base';
@@ -325,6 +328,7 @@ class _ProductFormState extends State<ProductForm> {
     defaultSellingUnit = p?.defaultSellingUnit ?? 'base';
     photo = p?.photo;
     expiryDate = p?.expiryDate;
+    selectedLabel = p?.label;
   }
 
   bool get _addingBlockedByCount =>
@@ -399,6 +403,17 @@ class _ProductFormState extends State<ProductForm> {
     } catch (_) {
       return false;
     }
+  }
+
+  List<String> get _availableLabels {
+    final labels = List<String>.from(widget.store.itemLabels);
+    final selected = selectedLabel?.trim();
+    if (selected != null &&
+        selected.isNotEmpty &&
+        !labels.any((label) => label.toLowerCase() == selected.toLowerCase())) {
+      labels.add(selected);
+    }
+    return labels;
   }
 
   List<String> get _categorySuggestions {
@@ -484,6 +499,7 @@ class _ProductFormState extends State<ProductForm> {
           unit: unit.text.trim().isEmpty ? 'pcs' : unit.text.trim(),
           photo: photo,
           expiryDate: expiryDate,
+          label: selectedLabel,
           packSize: sellsByPack ? int.parse(packSize.text) : 1,
           packPrice: sellsByPack ? parseMoney(packPrice.text) : null,
           defaultSellingUnit: sellsByPack ? defaultSellingUnit : 'base',
@@ -970,39 +986,13 @@ class _ProductFormState extends State<ProductForm> {
                 ),
                 validator: number,
               ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: saving || _addingBlockedByCount ? null : save,
-                icon: const Icon(Icons.check),
-                label: Text(saving ? 'Saving…' : 'Save item'),
-              ),
-              const SizedBox(height: 12),
-              ExpansionTile(
-                tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-                title: const Text('Advanced'),
-                subtitle: Text(
-                  expiryDate == null
-                      ? 'Add optional item details'
-                      : 'Expires ${DateFormat('d MMM yyyy').format(expiryDate!)}',
-                  style: TextStyle(fontSize: 11, color: context.stockMuted),
-                ),
-                children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    leading: const Icon(Icons.event_outlined),
-                    title: const Text('Expiry date'),
-                    subtitle: Text(
-                      expiryDate == null
-                          ? 'Not set'
-                          : DateFormat('EEE, d MMM yyyy').format(expiryDate!),
-                    ),
-                    trailing: expiryDate == null
-                        ? const Icon(Icons.chevron_right)
-                        : IconButton(
-                            tooltip: 'Clear expiry date',
-                            icon: const Icon(Icons.close),
-                            onPressed: () => setState(() => expiryDate = null),
-                          ),
+              if (widget.store.showExpiryDateField || expiryDate != null) ...[
+                const SizedBox(height: 14),
+                Material(
+                  color: context.stockPaper,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
                     onTap: () async {
                       final now = DateTime.now();
                       final selected = await showDatePicker(
@@ -1015,8 +1005,101 @@ class _ProductFormState extends State<ProductForm> {
                         setState(() => expiryDate = selected);
                       }
                     },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 11,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.stockLine),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.event_outlined, color: context.stockInk),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Expiry date',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                Text(
+                                  expiryDate == null
+                                      ? 'Not set'
+                                      : DateFormat(
+                                          'EEE, d MMM yyyy',
+                                        ).format(expiryDate!),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.stockMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (expiryDate != null)
+                            IconButton(
+                              tooltip: 'Clear expiry date',
+                              icon: const Icon(Icons.close),
+                              onPressed: () =>
+                                  setState(() => expiryDate = null),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
+              ],
+              if ((widget.store.showItemLabels &&
+                      widget.store.itemLabels.isNotEmpty) ||
+                  selectedLabel != null) ...[
+                const SizedBox(height: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Label',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _availableLabels.map((label) {
+                        final isSelected = selectedLabel == label;
+                        return TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: isSelected
+                                ? context.stockInk
+                                : context.stockMuted,
+                            side: BorderSide(
+                              color: isSelected ? avocado : context.stockLine,
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                          ),
+                          onPressed: () => setState(
+                            () => selectedLabel = isSelected ? null : label,
+                          ),
+                          child: Text(label),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 28),
+              FilledButton.icon(
+                onPressed: saving || _addingBlockedByCount ? null : save,
+                icon: const Icon(Icons.check),
+                label: Text(saving ? 'Saving…' : 'Save item'),
               ),
               const SizedBox(height: 24),
             ],

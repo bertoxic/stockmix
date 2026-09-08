@@ -168,7 +168,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             children: [
               const Center(child: Eyebrow('Offline Fountain QR Transfer')),
               const SizedBox(height: 6),
@@ -178,7 +178,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // Animated QR Screen Display
               if (displayMode == QrDisplayMode.dualStacked &&
@@ -187,8 +187,8 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                   child: Container(
                     width: 320,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
+                      horizontal: 8,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -225,8 +225,8 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(
-                            vertical: 4,
-                            horizontal: 16,
+                            vertical: 3,
+                            horizontal: 12,
                           ),
                           child: Divider(
                             height: 1,
@@ -256,81 +256,92 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
               ] else if (displayMode == QrDisplayMode.dualSideBySide &&
                   secondFrame != null) ...[
                 Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 155,
-                              height: 155,
-                              child: frame != null
-                                  ? _binaryQr(
-                                      frame,
-                                      padding: const EdgeInsets.all(4),
-                                    )
-                                  : const Center(
-                                      child: CircularProgressIndicator(),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final maxCardWidth = constraints.maxWidth;
+                      // 6*2 container padding + 6*2 divider margins + 1 divider width = 25px total horizontal overhead
+                      final qrSize = ((maxCardWidth - 25) / 2).clamp(110.0, 160.0);
+
+                      return FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: qrSize,
+                                    height: qrSize,
+                                    child: frame != null
+                                        ? _binaryQr(
+                                            frame,
+                                            padding: const EdgeInsets.all(4),
+                                          )
+                                        : const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Stream A (#${frame!.sequence + 1})',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.stockMuted,
                                     ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Stream A (#${frame!.sequence + 1})',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: context.stockMuted,
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          width: 1,
-                          height: 140,
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          color: cement,
-                        ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 155,
-                              height: 155,
-                              child: _binaryQr(
-                                secondFrame!,
-                                padding: const EdgeInsets.all(4),
+                              Container(
+                                width: 1,
+                                height: qrSize * 0.9,
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
+                                color: cement.withValues(alpha: 0.6),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Stream B (#${secondFrame!.sequence + 1})',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: context.stockMuted,
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: qrSize,
+                                    height: qrSize,
+                                    child: _binaryQr(
+                                      secondFrame!,
+                                      padding: const EdgeInsets.all(4),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Stream B (#${secondFrame!.sequence + 1})',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.stockMuted,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
               ] else ...[
@@ -338,7 +349,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                   child: Container(
                     width: 300,
                     height: 300,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -353,7 +364,7 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                     child: frame != null
                         ? _binaryQr(
                             frame,
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(5),
                           )
                         : const Center(child: CircularProgressIndicator()),
                   ),
@@ -504,7 +515,8 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                                 : 'Off for maximum speed (${preparedPayload.totalBlocks} blocks). Fast and light.',
                             style: TextStyle(
                               fontSize: 11,
-                              color: context.stockMuted,
+                              color: includePhotos ? context.stockRust : context.stockMuted,
+                              fontWeight: includePhotos ? FontWeight.w600 : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -554,15 +566,21 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
                       children: QrDisplayMode.values.map((mode) {
                         final isSelected = displayMode == mode;
                         return ChoiceChip(
+                          selectedColor: plum,
+                          backgroundColor: context.stockPaper,
+                          side: BorderSide(
+                            color: isSelected ? plum : context.stockLine,
+                          ),
                           avatar: Icon(
                             mode.icon,
                             size: 16,
-                            color: isSelected ? Colors.white : context.stockInk,
+                            color: isSelected ? paper : context.stockInk,
                           ),
                           label: Text(
                             mode.label,
                             style: TextStyle(
                               fontSize: 11,
+                              color: isSelected ? paper : context.stockInk,
                               fontWeight: isSelected
                                   ? FontWeight.w700
                                   : FontWeight.normal,
@@ -613,10 +631,16 @@ class _QrStreamSenderPageState extends State<QrStreamSenderPage> {
   Widget _speedChip(String label, int ms) {
     final selected = intervalMs == ms;
     return ChoiceChip(
+      selectedColor: plum,
+      backgroundColor: context.stockPaper,
+      side: BorderSide(
+        color: selected ? plum : context.stockLine,
+      ),
       label: Text(
         label,
         style: TextStyle(
           fontSize: 11,
+          color: selected ? paper : context.stockInk,
           fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
         ),
       ),

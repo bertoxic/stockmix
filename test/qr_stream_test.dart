@@ -36,6 +36,30 @@ void main() {
       expect(parsed.blockData, dummyData);
     });
 
+    test('roundtrips 54-byte SMX2 frame with full 256-bit SHA-256', () {
+      final dummyData = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
+      const testSha256 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+      final frame = StreamFrame(
+        sessionId: 'a1b2c3d4',
+        sequence: 2,
+        totalBlocks: 5,
+        payloadLength: 42,
+        fullSha256: testSha256,
+        crc32: Crc32.compute(dummyData),
+        blockData: dummyData,
+        blockIndices: {2},
+      );
+
+      final bytes = frame.toQrBytes();
+      expect(bytes.length, 54 + dummyData.length);
+      final parsed = StreamFrame.parseBytes(bytes);
+      expect(parsed, isNotNull);
+      expect(parsed!.sessionId, 'a1b2c3d4');
+      expect(parsed.sequence, 2);
+      expect(parsed.fullSha256, testSha256);
+      expect(parsed.blockData, dummyData);
+    });
+
     test('rejects a byte frame with a corrupt CRC32 checksum', () {
       final dummyData = Uint8List.fromList([1, 2, 3, 4, 5]);
       final frame = StreamFrame(
@@ -206,6 +230,38 @@ void main() {
       final result = decoder.verifyAndDecompress(expectedFullSha256: '0000000000000000000000000000000000000000000000000000000000000000');
       expect(result.isValid, isFalse);
       expect(result.errorMessage, contains('hash mismatch'));
+    });
+
+    test('automatically verifies complete 256-bit SHA-256 hash without external parameter', () {
+      final prepared = StreamPreparedPayload.fromJson(sampleBundle, blockSize: 150);
+      final encoder = QrStreamEncoder(prepared);
+      final decoder = QrStreamDecoder();
+
+      for (var i = 0; i < prepared.totalBlocks; i++) {
+        decoder.processRawBytes(encoder.nextFrame().toQrBytes());
+      }
+
+      expect(decoder.isComplete, isTrue);
+      final result = decoder.verifyAndDecompress();
+      expect(result.isValid, isTrue);
+      expect(result.sha256, prepared.fullSha256);
+      expect(result.sha256!.length, 64);
+    });
+
+    test('verifyAndDecompressAsync offloads verification and decompression successfully', () async {
+      final prepared = StreamPreparedPayload.fromJson(sampleBundle, blockSize: 150);
+      final encoder = QrStreamEncoder(prepared);
+      final decoder = QrStreamDecoder();
+
+      for (var i = 0; i < prepared.totalBlocks; i++) {
+        decoder.processRawBytes(encoder.nextFrame().toQrBytes());
+      }
+
+      expect(decoder.isComplete, isTrue);
+      final result = await decoder.verifyAndDecompressAsync();
+      expect(result.isValid, isTrue);
+      expect(result.payload!['id'], 'test-bundle-001');
+      expect(result.sha256, prepared.fullSha256);
     });
   });
 
@@ -485,6 +541,76 @@ void main() {
       expect(result.isValid, isTrue);
       expect(result.transferDuration, isNotNull);
       expect(result.payload!['id'], 'bundle-timing-test');
+    });
+
+    test('preserves legitimate user text such as \$SL or \$DR in product names and notes without alteration', () {
+      final trickyJson = {
+        'format': 'stockmix',
+        'version': 1,
+        'id': 'tricky-snap',
+        'kind': 'Stock snapshot',
+        'shop': r'Super $SL Shop',
+        'currency': 'USD',
+        'exportedAt': '2026-09-06T14:00:00.000Z',
+        'products': [
+          {
+            'id': 'p1',
+            'name': r'$SL',
+            'category': r'Category $SS',
+            'barcode': r'$WS-123',
+            'price': 600,
+            'cost': 200,
+            'opening': 10,
+            'threshold': 2,
+            'unit': r'$RC',
+            'photo': null,
+            'onHand': 10,
+          },
+          {
+            'id': 'p2',
+            'name': 'Sale Item',
+            'category': 'Pantry',
+            'barcode': '9876543210987',
+            'price': 350,
+            'cost': 120,
+            'opening': 25,
+            'threshold': 5,
+            'unit': 'pcs',
+            'photo': null,
+            'onHand': 20,
+          }
+        ],
+        'movements': [
+          {
+            'id': 'm1',
+            'productId': 'p1',
+            'name': r'$SL',
+            'type': 'Sale',
+            'delta': -2,
+            'price': 600,
+            'cost': 200,
+            'note': r'Sold $SL item under $DR promo',
+            'reference': r'$RR-ref',
+            'at': '2026-09-06T14:15:00.000Z',
+          }
+        ],
+      };
+
+      final compressed = DomainDictionaryCompressor.compressJsonString(jsonEncode(trickyJson));
+      final decompressed = DomainDictionaryCompressor.decompressJsonString(compressed);
+      final dynamic restored = jsonDecode(decompressed);
+
+      expect(restored['shop'], r'Super $SL Shop');
+      expect(restored['products'][0]['name'], r'$SL');
+      expect(restored['products'][0]['name'], isNot('Sale'));
+      expect(restored['products'][0]['category'], r'Category $SS');
+      expect(restored['products'][0]['barcode'], r'$WS-123');
+      expect(restored['products'][0]['unit'], r'$RC');
+      expect(restored['products'][1]['name'], 'Sale Item');
+      expect(restored['movements'][0]['name'], r'$SL');
+      expect(restored['movements'][0]['type'], 'Sale');
+      expect(restored['movements'][0]['note'], r'Sold $SL item under $DR promo');
+      expect(restored['movements'][0]['reference'], r'$RR-ref');
     });
   });
 }

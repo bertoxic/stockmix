@@ -52,11 +52,28 @@ String unitLabel(String unit, int quantity) {
   return '${trimmed}s';
 }
 
+List<String> cleanItemLabels(Iterable<String> values) {
+  final labels = <String>[];
+  for (final value in values) {
+    final label = value.trim();
+    if (label.isEmpty ||
+        labels.any(
+          (existing) => existing.toLowerCase() == label.toLowerCase(),
+        )) {
+      continue;
+    }
+    labels.add(label);
+    if (labels.length == 3) break;
+  }
+  return labels;
+}
+
 class Product {
   final String id, name, category, barcode, unit;
   final int price, cost, opening, threshold;
   final String? photo;
   final DateTime? expiryDate;
+  final String? label;
 
   /// Inventory is always counted in [unit], the product's base unit.
   ///
@@ -77,6 +94,7 @@ class Product {
     this.unit = 'pcs',
     this.photo,
     this.expiryDate,
+    this.label,
     this.packSize = 1,
     this.packPrice,
     this.defaultSellingUnit = 'base',
@@ -109,6 +127,7 @@ class Product {
     'unit': unit,
     'photo': photo,
     'expiryDate': expiryDate?.toIso8601String(),
+    'label': label,
     'packSize': packSize,
     'packPrice': packPrice,
     'defaultSellingUnit': defaultSellingUnit,
@@ -127,6 +146,9 @@ class Product {
     expiryDate: j['expiryDate'] is String
         ? DateTime.tryParse(j['expiryDate'] as String)
         : null,
+    label: j['label'] is String
+        ? j['label'] as String
+        : j['toxiLabel'] as String?,
     packSize: j['packSize'] is int ? j['packSize'] as int : 1,
     packPrice: j['packPrice'] is int ? j['packPrice'] as int : null,
     defaultSellingUnit: j['defaultSellingUnit'] == 'pack' ? 'pack' : 'base',
@@ -258,6 +280,14 @@ class SaleCart extends MapBase<String, int> {
         quantity: _lines[index].quantity + quantity,
       );
     }
+  }
+
+  /// Moves a line to the front without changing its quantity. Scanner pages
+  /// use this after an accepted barcode so the latest scan stays visible.
+  void moveToFront(String lineKey) {
+    final index = _lines.indexWhere((line) => line.key == lineKey);
+    if (index <= 0) return;
+    _lines.insert(0, _lines.removeAt(index));
   }
 
   void removeOne(SaleLine line) {
@@ -408,6 +438,9 @@ class StockStore extends ChangeNotifier {
   bool hapticsEnabled = true;
   String themeMode = 'light';
   bool showStoreStatistics = false;
+  bool showExpiryDateField = false;
+  bool showItemLabels = false;
+  List<String> itemLabels = [];
 
   List<Product> get products => List.unmodifiable(_products);
   List<Movement> get movements => List.unmodifiable(_movements);
@@ -451,6 +484,9 @@ class StockStore extends ChangeNotifier {
     'hapticsEnabled': hapticsEnabled,
     'themeMode': themeMode,
     'showStoreStatistics': showStoreStatistics,
+    'showExpiryDateField': showExpiryDateField,
+    'showItemLabels': showItemLabels,
+    'itemLabels': itemLabels,
   };
 
   void _restore(Map<String, dynamic> data) {
@@ -480,6 +516,12 @@ class StockStore extends ChangeNotifier {
     hapticsEnabled = data['hapticsEnabled'] ?? true;
     themeMode = data['themeMode'] ?? 'light';
     showStoreStatistics = data['showStoreStatistics'] ?? false;
+    showExpiryDateField = data['showExpiryDateField'] ?? false;
+    showItemLabels =
+        data['showItemLabels'] ?? data['showToxiLabelField'] ?? false;
+    itemLabels = cleanItemLabels(
+      (data['itemLabels'] as List? ?? const []).whereType<String>(),
+    );
   }
 
   Future<T> _commit<T>(T Function() change) async {
@@ -621,6 +663,9 @@ class StockStore extends ChangeNotifier {
     bool? haptics,
     String? theme,
     bool? showStatistics,
+    bool? showExpiryField,
+    bool? showLabels,
+    Iterable<String>? labels,
   }) => _commit(() {
     if (storeName != null && storeName.trim().isNotEmpty) {
       shop = storeName.trim();
@@ -633,6 +678,9 @@ class StockStore extends ChangeNotifier {
     if (haptics != null) hapticsEnabled = haptics;
     if (theme != null) themeMode = theme;
     if (showStatistics != null) showStoreStatistics = showStatistics;
+    if (showExpiryField != null) showExpiryDateField = showExpiryField;
+    if (showLabels != null) showItemLabels = showLabels;
+    if (labels != null) itemLabels = cleanItemLabels(labels);
   });
 
   // --- Held Sales ---
@@ -1397,6 +1445,7 @@ class StockStore extends ChangeNotifier {
               unit: existing.unit,
               photo: p.photo,
               expiryDate: existing.expiryDate,
+              label: existing.label,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,
@@ -1463,6 +1512,7 @@ class StockStore extends ChangeNotifier {
               unit: existing.unit,
               photo: p.photo,
               expiryDate: existing.expiryDate,
+              label: existing.label,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,
@@ -1544,6 +1594,7 @@ class StockStore extends ChangeNotifier {
       unit: product.unit,
       photo: product.photo,
       expiryDate: product.expiryDate,
+      label: product.label,
       packSize: product.packSize,
       packPrice: product.packPrice == null
           ? null
@@ -1625,6 +1676,7 @@ class StockStore extends ChangeNotifier {
               unit: existing.unit,
               photo: p.photo,
               expiryDate: existing.expiryDate,
+              label: existing.label,
               packSize: existing.packSize,
               packPrice: existing.packPrice,
               defaultSellingUnit: existing.defaultSellingUnit,

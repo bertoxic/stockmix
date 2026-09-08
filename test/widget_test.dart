@@ -7,11 +7,14 @@ import 'package:stockmix/operations.dart';
 import 'package:stockmix/pages.dart';
 import 'package:stockmix/reorder_page.dart';
 import 'package:stockmix/scanner_page.dart';
+import 'package:stockmix/settings_page.dart';
 import 'package:stockmix/stock_store.dart';
 
 void main() {
-  testWidgets('reorder quantity controls wrap on narrow phones', (tester) async {
-    tester.view.physicalSize = const Size(320, 700);
+  testWidgets('reorder quantity controls wrap on narrow phones', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -30,11 +33,20 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(theme: stockTheme(), home: ReorderPage(store: store)),
+      MaterialApp(
+        theme: stockTheme(),
+        home: ReorderPage(store: store),
+      ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Order quantity:'), findsOneWidget);
+    final quantityField = find.byKey(const ValueKey('order-quantity-low-item'));
+    await tester.ensureVisible(quantityField);
+    await tester.tap(quantityField);
+    await tester.enterText(quantityField, '7');
+    await tester.pump();
+    expect(find.text('7 units'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -266,13 +278,22 @@ void main() {
       // Both items are present under the scanner
       expect(find.text('Oat Milk 1L'), findsOneWidget);
       expect(find.text('Espresso Beans'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Espresso Beans')).dy,
+        lessThan(tester.getTopLeft(find.text('Oat Milk 1L')).dy),
+      );
       // Total is $3.50 + $12.00 = $15.50
       expect(find.text('\$15.50'), findsOneWidget);
       expect(find.text('2 units'), findsWidgets);
 
       // Increment Oat Milk quantity using the '+' icon
-      final addButtons = find.byIcon(Icons.add_circle_outline);
-      await tester.tap(addButtons.first);
+      final oatCard = find.ancestor(
+        of: find.text('Oat Milk 1L'),
+        matching: find.byType(Surface),
+      );
+      await tester.tap(
+        find.descendant(of: oatCard, matching: find.byTooltip('Add one')),
+      );
       await tester.pumpAndSettle();
 
       // Total is now 2 * $3.50 + $12.00 = $19.00
@@ -666,6 +687,16 @@ void main() {
 
     // Should be in StoreSettingsPage
     expect(find.text('Store & App Settings'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Scan audio tone'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(StoreSettingsPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('Scan audio tone'), findsOneWidget);
     expect(find.text('Haptic vibration'), findsOneWidget);
     expect(find.text('Your name'), findsOneWidget);
