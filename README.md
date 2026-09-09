@@ -4,6 +4,8 @@ An offline Flutter inventory and cash-sales app using the supplied avocado, plum
 
 ## Run
 
+For Android APK build commands and phone installation steps, see [Build and install an APK](BUILD_APK.md).
+
 ```sh
 flutter pub get
 flutter run
@@ -73,3 +75,4 @@ Not included: hosted accounts, staff permissions or manager authentication, mult
 - [Native sharing through share_plus](https://pub.dev/packages/share_plus)
 - [Image picker](https://pub.dev/packages/image_picker)
 # stockmix
+# zenbox
