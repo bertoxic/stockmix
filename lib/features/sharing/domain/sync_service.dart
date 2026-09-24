@@ -1,4 +1,4 @@
-import "../../../stock_store.dart";
+import 'package:stockmix/features/stock/stock_store.dart';
 import "share_session.dart";
 
 Map<String, dynamic> createSyncBundle(StockStore store, SyncScope scope) {

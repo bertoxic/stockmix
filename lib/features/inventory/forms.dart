@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'design.dart';
-import 'media_service.dart';
-import 'scanner_page.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/services/media_service.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/scanner/scanner_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 class PhotoInput extends StatefulWidget {
   final String? value;

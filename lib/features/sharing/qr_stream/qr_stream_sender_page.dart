@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart' as qr;
 import 'package:qr_flutter/qr_flutter.dart';
-import '../design.dart';
-import '../stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import 'qr_stream_coder.dart';
 import 'entry_hasher.dart';
 

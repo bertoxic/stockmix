@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../design.dart';
-import '../scan_feedback.dart';
-import '../stock_store.dart';
+import 'package:stockmix/core/services/scan_feedback.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import 'qr_stream_coder.dart';
 import 'stream_import_review_page.dart';
 

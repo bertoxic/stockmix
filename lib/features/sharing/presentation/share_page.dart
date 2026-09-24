@@ -3,14 +3,14 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'design.dart';
-import 'stock_store.dart';
-import 'features/sharing/domain/share_session.dart';
-import 'features/sharing/domain/sync_service.dart';
-import 'features/sharing/presentation/nearby_receive_screen.dart';
-import 'features/sharing/presentation/nearby_share_screen.dart';
-import 'qr_stream/qr_stream_sender_page.dart';
-import 'qr_stream/qr_stream_receiver_page.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/sharing/domain/share_session.dart';
+import 'package:stockmix/features/sharing/domain/sync_service.dart';
+import 'package:stockmix/features/sharing/presentation/nearby_receive_screen.dart';
+import 'package:stockmix/features/sharing/presentation/nearby_share_screen.dart';
+import 'package:stockmix/features/sharing/qr_stream/qr_stream_receiver_page.dart';
+import 'package:stockmix/features/sharing/qr_stream/qr_stream_sender_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 String senderLabel(Map<String, dynamic> record) {
   final sender = (record['senderName'] as String?)?.trim();

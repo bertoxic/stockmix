@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
-import 'design.dart';
-import 'pages.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 class ReorderPage extends StatefulWidget {
   final StockStore store;

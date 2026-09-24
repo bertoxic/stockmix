@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'calculator.dart';
-import 'design.dart';
-import 'invoice_page.dart';
-import 'pages.dart';
-import 'scanner_page.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/core/widgets/calculator.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/sales/invoice_page.dart';
+import 'package:stockmix/features/scanner/scanner_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 class SalePage extends StatefulWidget {
   final StockStore store;

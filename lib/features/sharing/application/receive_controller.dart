@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../../../stock_store.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import '../domain/share_session.dart';
 import '../domain/sync_service.dart';
 import '../domain/transfer_envelope.dart';

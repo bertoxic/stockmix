@@ -1,19 +1,20 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'calculator.dart';
-import 'backup_page.dart';
-import 'design.dart';
-import 'forms.dart';
-import 'invoice_page.dart';
-import 'operations.dart';
-import 'reorder_page.dart';
-import 'scanner_page.dart';
-import 'settings_page.dart';
-import 'sharing.dart';
-import 'stock_store.dart';
-import 'qr_stream/qr_stream_receiver_page.dart';
-import 'qr_stream/qr_stream_sender_page.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/core/widgets/calculator.dart';
+import 'package:stockmix/features/inventory/forms.dart';
+import 'package:stockmix/features/inventory/reorder_page.dart';
+import 'package:stockmix/features/sales/invoice_page.dart';
+import 'package:stockmix/features/sales/operations.dart';
+import 'package:stockmix/features/scanner/scanner_page.dart';
+import 'package:stockmix/features/settings/backup_page.dart';
+import 'package:stockmix/features/settings/privacy_policy_page.dart';
+import 'package:stockmix/features/settings/settings_page.dart';
+import 'package:stockmix/features/sharing/presentation/share_page.dart';
+import 'package:stockmix/features/sharing/qr_stream/qr_stream_receiver_page.dart';
+import 'package:stockmix/features/sharing/qr_stream/qr_stream_sender_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 String money(StockStore store, int cents) =>
     NumberFormat.simpleCurrency(name: store.currency).format(cents / 100);
@@ -504,7 +505,7 @@ class _StockShellState extends State<StockShell> {
                         wide ? 40 : 22,
                         wide ? 32 : 20,
                         wide ? 40 : 22,
-                        30,
+                        wide ? 30 : 100,
                       ),
                       children: [
                         header(),
@@ -1159,9 +1160,11 @@ class _StockShellState extends State<StockShell> {
         children: [
           Icon(Icons.lock_outline, size: 12, color: cement),
           SizedBox(width: 6),
-          Text(
-            'Saved on your device. Ready when you are.',
-            style: TextStyle(color: context.stockMuted, fontSize: 10),
+          Flexible(
+            child: Text(
+              'Saved on your device. Ready when you are.',
+              style: TextStyle(color: context.stockMuted, fontSize: 10),
+            ),
           ),
         ],
       ),
@@ -2326,6 +2329,12 @@ class _StockShellState extends State<StockShell> {
             'Full backup & restore',
             'Save everything or restore a previous backup file',
             () => open(BackupRestorePage(store: store)),
+          ),
+          menu(
+            Icons.privacy_tip_outlined,
+            'Privacy & data policy',
+            '100% offline · No tracking · All data stays on this device',
+            () => open(const PrivacyPolicyPage()),
           ),
         ],
       ),

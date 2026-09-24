@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import '../stock_store.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 /// Content-based canonical hashing and deduplication engine for Stockmix entries.
 class EntryHasher {

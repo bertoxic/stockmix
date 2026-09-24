@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'database.dart';
-import 'design.dart';
-import 'stock_store.dart';
-import 'pages.dart';
+import 'package:stockmix/core/database/database.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

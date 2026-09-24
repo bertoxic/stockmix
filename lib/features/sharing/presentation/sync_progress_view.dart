@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../design.dart';
+import 'package:stockmix/core/theme/design.dart';
 import '../domain/transfer_state.dart';
 
 /// Shared host/join flow. Progress reflects transport events, not a timer.

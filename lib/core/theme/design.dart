@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'stock_store.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 const plum = Color(0xFF372F36),
     linen = Color(0xFFF2ECE5),

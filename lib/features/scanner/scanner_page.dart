@@ -12,12 +12,12 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'calculator.dart';
-import 'design.dart';
-import 'forms.dart';
-import 'pages.dart';
-import 'scan_feedback.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/services/scan_feedback.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/core/widgets/calculator.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/inventory/forms.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 enum ScannerMode {
   /// Continuous multi-item scanning for sales. Scanned items appear in the live list below the camera,

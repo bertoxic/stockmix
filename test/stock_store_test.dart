@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sembast/sembast_memory.dart';
-import 'package:stockmix/design.dart';
-import 'package:stockmix/stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 Product item({
   String id = 'p1',

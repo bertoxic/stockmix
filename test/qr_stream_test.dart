@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stockmix/qr_stream/qr_stream_coder.dart';
-import 'package:stockmix/qr_stream/entry_hasher.dart';
-import 'package:stockmix/stock_store.dart';
+import 'package:stockmix/features/sharing/qr_stream/entry_hasher.dart';
+import 'package:stockmix/features/sharing/qr_stream/qr_stream_coder.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 void main() {
   group('CRC32 & Frame Formatting', () {

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'design.dart';
-import 'pages.dart';
-import 'scan_feedback.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/services/scan_feedback.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/settings/privacy_policy_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 class StoreSettingsPage extends StatefulWidget {
   final StockStore store;
@@ -636,6 +637,14 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                   ),
                   onPressed: _saving ? null : _save,
                   child: const Text('Save Settings'),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => showPrivacyPolicyDialog(context),
+                    icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                    label: const Text('Privacy & Data Policy'),
+                  ),
                 ),
               ],
             ),

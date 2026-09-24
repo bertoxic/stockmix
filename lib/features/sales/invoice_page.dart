@@ -8,9 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'design.dart';
-import 'pages.dart';
-import 'stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 
 class ReceiptLineItem {
   final Product product;

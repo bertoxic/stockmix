@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../design.dart';
-import '../stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import 'entry_hasher.dart';
 
 /// Duplicate-Safe Stream Import Review Screen.

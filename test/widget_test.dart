@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stockmix/design.dart';
-import 'package:stockmix/forms.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/inventory/forms.dart';
+import 'package:stockmix/features/inventory/reorder_page.dart';
+import 'package:stockmix/features/sales/operations.dart';
+import 'package:stockmix/features/scanner/scanner_page.dart';
+import 'package:stockmix/features/settings/settings_page.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import 'package:stockmix/main.dart';
-import 'package:stockmix/operations.dart';
-import 'package:stockmix/pages.dart';
-import 'package:stockmix/reorder_page.dart';
-import 'package:stockmix/scanner_page.dart';
-import 'package:stockmix/settings_page.dart';
-import 'package:stockmix/stock_store.dart';
 
 void main() {
   testWidgets('reorder quantity controls wrap on narrow phones', (
@@ -130,8 +130,12 @@ void main() {
     await tester.pumpWidget(StockmixApp(store: store));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('Share sale'), 250);
-    await tester.ensureVisible(find.text('Share sale'));
+    await tester.scrollUntilVisible(find.text('Share sale'), 200);
+    Scrollable.ensureVisible(
+      tester.element(find.text('Share sale')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find
           .ancestor(of: find.text('Share sale'), matching: find.byType(InkWell))

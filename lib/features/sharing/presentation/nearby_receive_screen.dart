@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../../design.dart';
-import '../../../stock_store.dart';
+import 'package:stockmix/core/theme/design.dart';
+import 'package:stockmix/features/stock/stock_store.dart';
 import '../application/receive_controller.dart';
 import '../domain/share_session.dart';
 import '../domain/transfer_state.dart';
