@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Stockmix</title>
+  <meta name="description" content="Official Privacy Policy for Stockmix, an offline-first inventory and cash sales application.">
+  <style>
+    :root {
+      --color-plum: #2D1F33;
+      --color-plum-light: #44304D;
+      --color-avocado: #3E6446;
+      --color-avocado-light: #EBF2EC;
+      --color-linen: #F8F7F4;
+      --color-surface: #FFFFFF;
+      --color-ink: #1C1917;
+      --color-muted: #57534E;
+      --color-border: #E7E5E4;
+      --color-rust: #B45309;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      line-height: 1.7;
+      color: var(--color-ink);
+      background-color: var(--color-linen);
+      padding: 24px 16px 80px;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      background-color: var(--color-surface);
+      border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      padding: 48px;
+      border: 1px solid var(--color-border);
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 24px 20px;
+        border-radius: 16px;
+      }
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background-color: var(--color-avocado-light);
+      color: var(--color-avocado);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 34px;
+      line-height: 1.25;
+      color: var(--color-plum);
+      margin-bottom: 12px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--color-border);
+      color: var(--color-muted);
+      font-size: 14px;
+    }
+
+    .meta-bar strong {
+      color: var(--color-ink);
+    }
+
+    h2 {
+      font-size: 22px;
+      color: var(--color-plum);
+      margin-top: 36px;
+      margin-bottom: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      font-size: 17px;
+      color: var(--color-ink);
+      margin-top: 24px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #374151;
+      font-size: 15px;
+    }
+
+    ul, ol {
+      margin-bottom: 18px;
+      padding-left: 24px;
+      color: #374151;
+      font-size: 15px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .highlight-card {
+      background: linear-gradient(135deg, rgba(62, 100, 70, 0.08) 0%, rgba(45, 31, 51, 0.05) 100%);
+      border-left: 4px solid var(--color-avocado);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 24px 0;
+    }
+
+    .highlight-card h4 {
+      color: var(--color-avocado);
+      font-size: 16px;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .highlight-card p {
+      margin-bottom: 0;
+      font-size: 14.5px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 28px;
+      font-size: 14px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+    }
+
+    th {
+      background-color: var(--color-linen);
+      color: var(--color-plum);
+      font-weight: 700;
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: top;
+      color: #374151;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #FAFAF9;
+    }
+
+    .badge-no {
+      display: inline-block;
+      padding: 3px 8px;
+      background-color: #FEF3C7;
+      color: #92400E;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge-local {
+      display: inline-block;
+      padding: 3px 8px;
+      background-color: #EBF2EC;
+      color: var(--color-avocado);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background-color: #F3F4F6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--color-plum);
+    }
+
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-border);
+      font-size: 13px;
+      color: var(--color-muted);
+      text-align: center;
+    }
+
+    .footer a {
+      color: var(--color-avocado);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-badge">Zero Data Collection &bull; 100% Offline</div>
+    <h1>Privacy Policy for Stockmix</h1>
+    
+    <div class="meta-bar">
+      <div><strong>Effective Date:</strong> September 24, 2026</div>
+      <div><strong>Last Updated:</strong> September 24, 2026</div>
+      <div><strong>App ID:</strong> com.bertoxic.stockmix</div>
+    </div>
+
+    <div class="highlight-card">
+      <h4>Our Privacy Commitment</h4>
+      <p><strong>Stockmix is an offline-first inventory and cash register app.</strong> All of your inventory, prices, sales history, receipts, and photos are stored strictly on your local device. We run no cloud backends, require no accounts, deploy no trackers, and collect zero personal data from you.</p>
+    </div>
+
+    <h2>1. Overview & Privacy Philosophy</h2>
+    <p>Stockmix ("the App", "we", "us", or "our") is designed for merchants, retailers, and shopkeepers who demand total control over their business records. We believe that your commercial data belongs solely to you.</p>
+    <p>Stockmix is built on a <strong>Zero-Data-Collection Architecture</strong>:</p>
+    <ul>
+      <li><strong>No Remote Servers:</strong> We do not operate or maintain remote cloud servers for this app.</li>
+      <li><strong>No Accounts or Sign-ups:</strong> You do not need to register an email address, telephone number, or password.</li>
+      <li><strong>No Telemetry or Tracking:</strong> We do not monitor your activity, record usage metrics, or use profiling software.</li>
+      <li><strong>No Third-Party Advertisements:</strong> The app is completely ad-free and contains no advertising SDKs.</li>
+      <li><strong>Local Sandboxed Storage:</strong> All data resides within the private, isolated storage sandbox of your device.</li>
+    </ul>
+
+    <h2>2. Data We Do NOT Collect</h2>
+    <p>In compliance with Apple App Store Review Guidelines (Sections 5.1.1 & 5.1.2) and Google Play Developer Policies, we explicitly confirm that we do not collect, transmit, monetize, or disclose any of the following:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Personal Identifiers</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>No names, emails, phone numbers, or government IDs are transmitted off your device.</td>
+        </tr>
+        <tr>
+          <td><strong>Account Credentials</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>No user accounts, passwords, or authentication tokens exist on external servers.</td>
+        </tr>
+        <tr>
+          <td><strong>Financial & Payment Cards</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>The app records cash sales only. No credit card numbers, bank accounts, or payment gateways are accessed.</td>
+        </tr>
+        <tr>
+          <td><strong>Advertising / Device IDs</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>We do not access Apple IDFA, Google Advertising ID (AAID), or hardware MAC addresses.</td>
+        </tr>
+        <tr>
+          <td><strong>Analytics & Crash Telemetry</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>No third-party analytics (e.g. Firebase Analytics, Mixpanel) or crash reporters (e.g. Sentry, Crashlytics).</td>
+        </tr>
+        <tr>
+          <td><strong>Location Information</strong></td>
+          <td><span class="badge-no">Not Collected</span></td>
+          <td>We do not collect, record, or track your GPS coordinates or physical location.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. Information Processed Locally on Your Device</h2>
+    <p>The following data categories are entered or generated by you and reside exclusively on your physical device:</p>
+    <ul>
+      <li><strong>Store Configuration:</strong> Store name, cashier/operator name, currency choice (USD, EUR, GBP, NGN, KES, etc.), theme preference, sound, and haptic settings.</li>
+      <li><strong>Inventory Catalog:</strong> Item names, barcodes, categories, retail selling prices, cost prices, pack units/prices, alert thresholds, expiration dates, custom labels, and optional product photos.</li>
+      <li><strong>Sales & Cash Register Ledger:</strong> Items sold, quantities, selling units, discounts applied, cash received, receipt reference IDs, timestamps, and merchant transaction notes.</li>
+      <li><strong>Stock Audits:</strong> Stock count reconciliation snapshots, physical counts, variances, and adjustment reasons (e.g. damaged stock, returns, audit corrections).</li>
+    </ul>
+    <p><strong>Storage Technology:</strong> Data is persisted in a local, transactional Sembast database (or browser IndexedDB in web preview) inside the operating system's private application sandbox. It cannot be accessed by other apps without your authorization.</p>
+
+    <h2>4. Device Permissions & Technical Justifications</h2>
+    <p>Stockmix requests only the minimum device permissions needed to provide its core inventory and sales features:</p>
+
+    <h3>A. Camera (iOS & Android)</h3>
+    <ul>
+      <li><strong>iOS Usage Description:</strong> <code>Scan item barcodes and attach photos to your stock records.</code></li>
+      <li><strong>Android Permission:</strong> <code>android.permission.CAMERA</code></li>
+      <li><strong>Purpose:</strong> Scanning barcodes and QR codes on products for rapid lookup; scanning receipt QR codes for returns; reading animated QR stream packets during peer-to-peer sync; and taking optional product photos.</li>
+      <li><strong>Privacy:</strong> Camera frames are processed live in-memory and immediately discarded. Photos remain strictly in local storage and are never uploaded.</li>
+    </ul>
+
+    <h3>B. Photo Library & Storage (iOS & Android)</h3>
+    <ul>
+      <li><strong>iOS Usage Description:</strong> <code>Choose item photos and barcode images for your stock book.</code></li>
+      <li><strong>Android Permission:</strong> <code>READ_EXTERNAL_STORAGE</code> (maxSdkVersion 32; not requested on modern Android 13+)</li>
+      <li><strong>Purpose:</strong> Allows you to pick a product image from your gallery, scan a barcode from an existing photo, or save/restore backup files.</li>
+      <li><strong>Privacy:</strong> Only files explicitly selected by you through system dialogs are accessed.</li>
+    </ul>
+
+    <h3>C. Nearby Connections & Bluetooth (Android Only)</h3>
+    <ul>
+      <li><strong>Android Permissions:</strong> <code>BLUETOOTH_SCAN</code>, <code>BLUETOOTH_CONNECT</code>, <code>BLUETOOTH_ADVERTISE</code>, <code>NEARBY_WIFI_DEVICES</code>, <code>ACCESS_WIFI_STATE</code>, <code>CHANGE_WIFI_STATE</code>.</li>
+      <li><strong>Purpose:</strong> Used exclusively when you choose <strong>"Sync between phones"</strong> to transfer stock or daily sales snapshots directly to another nearby Android phone running Stockmix.</li>
+      <li><strong>Privacy:</strong> Establishes a direct, encrypted, peer-to-peer hardware link (Wi-Fi Direct / Bluetooth) between the two devices. No data travels across the Internet. Declared with <code>neverForLocation</code> flags so no location data is derived.</li>
+    </ul>
+
+    <h3>D. Location Permission (Android Legacy Requirement)</h3>
+    <ul>
+      <li><strong>Android Permissions:</strong> <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code></li>
+      <li><strong>Disclosure:</strong> Stockmix <strong>never</strong> reads or tracks your GPS location. On older Android versions (Android 11 and below), the Android operating system enforces location permission as a prerequisite for Bluetooth and Wi-Fi Direct discovery. On modern Android 12+, this is bypassed using dedicated nearby permissions.</li>
+    </ul>
+
+    <h2>5. Third-Party Libraries & On-Device ML</h2>
+    <p>Stockmix utilizes open-source, on-device libraries:</p>
+    <ul>
+      <li><strong>Google ML Kit Text Recognition:</strong> Used for on-device Optical Character Recognition (OCR) to read product labels and suggest item names. <em>All processing occurs 100% on-device. Images and text are never sent to Google servers.</em></li>
+      <li><strong>Mobile Scanner:</strong> Scans and decodes barcodes locally in real time. Scanned web links are never opened automatically.</li>
+      <li><strong>Share Plus & File Picker:</strong> Interfaces directly with your device's native file-saving and sharing systems.</li>
+    </ul>
+
+    <h2>6. User-Initiated Data Sharing & Export</h2>
+    <p>Stockmix never transmits your data automatically. The app provides three user-controlled sharing tools:</p>
+    <ol>
+      <li><strong>System Share & File Export:</strong> Export your data as a JSON file or CSV spreadsheet, or share receipt images via the system share sheet (AirDrop, Quick Share, messaging, email, or cloud drives). CSV files feature automatic formula escaping to protect against spreadsheet injection vulnerabilities.</li>
+      <li><strong>Peer-to-Peer Nearby Sync:</strong> Direct Android-to-Android encrypted exchange via local Wi-Fi Direct / Bluetooth without internet routing.</li>
+      <li><strong>Air-Gapped QR Stream Sync:</strong> Rapid visual transfer via animated QR codes displayed on screen and scanned by another device's camera. 100% offline and air-gapped.</li>
+    </ol>
+
+    <h2>7. Data Retention & Erasure</h2>
+    <ul>
+      <li><strong>Data Ownership:</strong> You have full ownership of your records.</li>
+      <li><strong>Manual Deletion:</strong> You can delete products, adjustment records, and count drafts at any time within the app.</li>
+      <li><strong>Complete Erasure:</strong> To completely and irreversibly erase all data, clear the application storage in your device settings (<code>Settings &rarr; Apps &rarr; Stockmix &rarr; Clear Storage</code>) or uninstall the app.</li>
+      <li><strong>Backups:</strong> The app does not perform background cloud backups. Use <strong>More &rarr; Full backup & restore</strong> to save manual backup archives.</li>
+    </ul>
+
+    <h2>8. Global Privacy & Legal Compliance</h2>
+    <h3>European Union & UK GDPR</h3>
+    <p>You (the merchant) are the Data Controller for any business records or customer notes stored in the app. The developer provides software only and does not process, host, or access personal data. You have the right to access and export your data at any time (JSON/CSV) and the right to erasure by clearing app storage.</p>
+
+    <h3>California Consumer Privacy Act (CCPA / CPRA)</h3>
+    <p>We do not sell, rent, or share personal information with third parties. Our sale of personal data is <strong>0%</strong>.</p>
+
+    <h3>Children's Online Privacy Protection Act (COPPA)</h3>
+    <p>Stockmix is a commercial utility for merchants and is not directed to children under 13. We do not collect information from children.</p>
+
+    <h2>9. App Store & Google Play Declarations</h2>
+    <div class="highlight-card">
+      <p><strong>Apple App Store Connect ("App Privacy"):</strong> Select <em>"No, we do not collect data from this app."</em> All data is stored exclusively on the user's local device.</p>
+      <p style="margin-top: 8px;"><strong>Google Play Console ("Data Safety"):</strong> Select <em>"No user data is collected or shared."</em> Local peer-to-peer data transfers are encrypted in transit, and users can delete all data at will.</p>
+    </div>
+
+    <h2>10. Contact Us</h2>
+    <p>If you have any questions or feedback regarding this Privacy Policy, please contact us:</p>
+    <ul>
+      <li><strong>Application:</strong> Stockmix</li>
+      <li><strong>Developer:</strong> Bertoxic</li>
+      <li><strong>Email:</strong> <a href="mailto:stockmix.help@gmail.com">stockmix.help@gmail.com</a></li>
+      <li><strong>Project Repository:</strong> <a href="https://github.com/bertoxic/stockmix" target="_blank" rel="noopener">github.com/bertoxic/stockmix</a></li>
+    </ul>
+
+    <div class="footer">
+      &copy; 2026 Stockmix &bull; Developed by Bertoxic &bull; All Rights Reserved
+    </div>
+  </div>
+
+</body>
+</html>

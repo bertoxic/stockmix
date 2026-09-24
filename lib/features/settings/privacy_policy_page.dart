@@ -171,7 +171,7 @@ class PrivacyPolicyPage extends StatelessWidget {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'support@stockmix.app',
+                'stockmix.help@gmail.com',
                 style: TextStyle(fontSize: 12, color: avocado, fontWeight: FontWeight.w600),
               ),
             ),
