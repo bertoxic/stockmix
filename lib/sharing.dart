@@ -3,9 +3,12 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import 'design.dart';
 import 'stock_store.dart';
+import 'features/sharing/domain/share_session.dart';
+import 'features/sharing/domain/sync_service.dart';
+import 'features/sharing/presentation/nearby_receive_screen.dart';
+import 'features/sharing/presentation/nearby_share_screen.dart';
 import 'qr_stream/qr_stream_sender_page.dart';
 import 'qr_stream/qr_stream_receiver_page.dart';
 
@@ -46,7 +49,7 @@ class _SharePageState extends State<SharePage> {
     }
   }
 
-  Future<void> export(bool share, Rect origin) async {
+  Future<void> export() async {
     setState(() => working = true);
     try {
       final data = format == 'json'
@@ -63,29 +66,265 @@ class _SharePageState extends State<SharePage> {
       final filename =
           'stockmix-${daily ? dayKey(day) : 'stock-${dayKey(DateTime.now())}'}.$format';
       final mime = format == 'json' ? 'application/json' : 'text/csv';
-      if (share) {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile.fromData(bytes, mimeType: mime, name: filename)],
-            fileNameOverrides: [filename],
-            title: daily ? 'Stockmix day record' : 'Stockmix stock snapshot',
-            sharePositionOrigin: origin,
-          ),
-        );
-      } else {
-        final saved = await FilePicker.saveFile(
-          fileName: filename,
-          bytes: bytes,
-          mimeType: mime,
-          dialogTitle: 'Export Stockmix file',
-        );
-        if (saved != null && mounted) showMessage(context, 'Export saved.');
-      }
+      final saved = await FilePicker.saveFile(
+        fileName: filename,
+        bytes: bytes,
+        mimeType: mime,
+        dialogTitle: 'Export Stockmix file',
+      );
+      if (saved != null && mounted) showMessage(context, 'Export saved.');
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => working = false);
     }
+  }
+
+  Future<void> syncBetweenPhones() async {
+    SyncScope selectedScope = SyncScope.all;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.sync_alt_rounded,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sync between phones',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Two-way exchange with merge when you are ready',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.stockMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Eyebrow('What to sync:'),
+                    const SizedBox(height: 10),
+                    _syncScopeOption(
+                      title: 'All (Products & Sales)',
+                      subtitle:
+                          'Full sync: adds new items & merges all sales records',
+                      icon: Icons.all_inclusive_rounded,
+                      scope: SyncScope.all,
+                      current: selectedScope,
+                      onTap: () =>
+                          setModalState(() => selectedScope = SyncScope.all),
+                    ),
+                    const SizedBox(height: 8),
+                    _syncScopeOption(
+                      title: "Today's sales only",
+                      subtitle:
+                          "Quick register sync: exchanges today's sales movements",
+                      icon: Icons.receipt_long_rounded,
+                      scope: SyncScope.sales,
+                      current: selectedScope,
+                      onTap: () =>
+                          setModalState(() => selectedScope = SyncScope.sales),
+                    ),
+                    const SizedBox(height: 8),
+                    _syncScopeOption(
+                      title: 'Products & stock only',
+                      subtitle:
+                          'Catalog sync: updates product list & stock count',
+                      icon: Icons.inventory_2_rounded,
+                      scope: SyncScope.products,
+                      current: selectedScope,
+                      onTap: () => setModalState(
+                        () => selectedScope = SyncScope.products,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Eyebrow('Choose this phone\'s role:'),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      NearbyReceiveScreen(store: widget.store),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              'Scan QR\n(Join sync)',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              final bundle = createSyncBundle(
+                                widget.store,
+                                selectedScope,
+                              );
+                              final session = ShareSession.create(
+                                mode: ShareSessionMode.sync,
+                                scope: selectedScope,
+                              );
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => NearbyShareScreen(
+                                    bundle: bundle,
+                                    store: widget.store,
+                                    session: session,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.qr_code_rounded, size: 20),
+                            label: const Text(
+                              'Show QR\n(Host sync)',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _syncScopeOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required SyncScope scope,
+    required SyncScope current,
+    required VoidCallback onTap,
+  }) {
+    final selected = scope == current;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: selected ? context.stockInk : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? context.stockInk.withValues(alpha: 0.04)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: selected ? context.stockInk : context.stockMuted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 11, color: context.stockMuted),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: selected ? context.stockInk : Colors.grey.shade400,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> importFile() async {
@@ -217,6 +456,55 @@ class _SharePageState extends State<SharePage> {
                 ],
               ),
             ),
+            const SizedBox(height: 18),
+            Surface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.sync_alt_rounded,
+                        size: 28,
+                        color: context.stockInk,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sync between two phones',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Two-way live exchange for sales and stock.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.stockMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: working ? null : syncBetweenPhones,
+                      icon: const Icon(Icons.sync_alt_rounded, size: 20),
+                      label: const Text('Start two-way sync'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 26),
             const Eyebrow('What would you like to send?'),
             const SizedBox(height: 14),
@@ -277,6 +565,10 @@ class _SharePageState extends State<SharePage> {
             ),
             const SizedBox(height: 23),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: plum,
+                foregroundColor: paper,
+              ),
               onPressed: working
                   ? null
                   : () {
@@ -293,66 +585,16 @@ class _SharePageState extends State<SharePage> {
                         ),
                       );
                     },
-              icon: const Icon(Icons.qr_code_2_rounded, size: 22),
-              label: const Text('Stream via animated QR code'),
-            ),
-            const SizedBox(height: 12),
-            Builder(
-              builder: (ctx) => OutlinedButton.icon(
-                onPressed: working
-                    ? null
-                    : () {
-                        final box = ctx.findRenderObject() as RenderBox;
-                        export(true, box.localToGlobal(Offset.zero) & box.size);
-                      },
-                icon: const Icon(Icons.ios_share_outlined, size: 20),
-                label: Text(
-                  working ? 'Preparing…' : 'Share file with another user',
-                ),
-              ),
+              icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+              label: const Text('Send with animated QR'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: working ? null : () => export(false, Rect.zero),
+              onPressed: working ? null : export,
               icon: const Icon(Icons.download_outlined, size: 20),
               label: const Text('Save as a file'),
             ),
             const SizedBox(height: 22),
-            Surface(
-              color: linen,
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.qr_code_scanner,
-                        size: 18,
-                        color: context.stockInk,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        '100% Offline Stream Transfer',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Animated QR streams transfer stock data camera-to-screen with no Wi-Fi, Bluetooth, or Internet required. Fountain coding ensures missing frames reconstruct automatically with duplicate-safe hashcodes.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.stockMuted,
-                      height: 1.6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 28),
             const Divider(),
             const SizedBox(height: 20),
@@ -362,6 +604,10 @@ class _SharePageState extends State<SharePage> {
             ),
             const SizedBox(height: 14),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: plum,
+                foregroundColor: paper,
+              ),
               onPressed: working
                   ? null
                   : () => Navigator.push(
@@ -371,8 +617,8 @@ class _SharePageState extends State<SharePage> {
                             QrStreamReceiverPage(store: widget.store),
                       ),
                     ),
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-              label: const Text('Scan incoming QR stream'),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Receive with animated QR'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

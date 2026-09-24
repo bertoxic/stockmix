@@ -1124,7 +1124,12 @@ class StockStore extends ChangeNotifier {
     }
     _movement(current, type, quantity, note.trim(), photo: photo);
   });
-  String _checkoutLines(SaleCart cart, String note, {String? photo}) {
+  String _checkoutLines(
+    SaleCart cart,
+    String note, {
+    String? photo,
+    int discount = 0,
+  }) {
     if (count != null) {
       final counted = count!['baseline'] as Map;
       final blocked = cart.keys.where((k) => counted.containsKey(k)).toList();
@@ -1136,6 +1141,9 @@ class StockStore extends ChangeNotifier {
       }
     }
     if (cart.isEmpty) throw StateError('Add an item to the sale.');
+    if (discount < 0 || discount > cart.total) {
+      throw StateError('Discount must be between zero and the sale total.');
+    }
     for (final productId in cart.keys) {
       final quantity = cart.baseQuantityFor(productId);
       if (quantity <= 0 || quantity > stock(product(productId))) {
@@ -1143,7 +1151,13 @@ class StockStore extends ChangeNotifier {
       }
     }
     final ref = newId();
-    for (final line in cart.lines) {
+    var discountLeft = discount;
+    for (var index = 0; index < cart.lines.length; index++) {
+      final line = cart.lines[index];
+      final lineDiscount = index == cart.lines.length - 1
+          ? discountLeft
+          : discount * line.total ~/ cart.total;
+      discountLeft -= lineDiscount;
       _movement(
         product(line.productId),
         'Sale',
@@ -1155,7 +1169,9 @@ class StockStore extends ChangeNotifier {
         saleUnit: line.unitName,
         saleUnitMultiplier: line.unitMultiplier,
         saleQuantity: line.quantity,
-        lineTotal: line.total,
+        // Allocate a fixed sale-wide discount across lines so revenue and
+        // later partial refunds use the cash amount actually received.
+        lineTotal: line.total - lineDiscount,
       );
     }
     return ref;
@@ -1163,8 +1179,14 @@ class StockStore extends ChangeNotifier {
 
   /// Records selected selling units while deducting their converted total in
   /// the product's base unit.
-  Future<String> checkoutSale(SaleCart cart, String note, {String? photo}) =>
-      _commit(() => _checkoutLines(cart, note, photo: photo));
+  Future<String> checkoutSale(
+    SaleCart cart,
+    String note, {
+    String? photo,
+    int discount = 0,
+  }) => _commit(
+    () => _checkoutLines(cart, note, photo: photo, discount: discount),
+  );
 
   /// Kept for existing callers and imports that use one base-unit price per
   /// product. New checkout UI uses [checkoutSale].
@@ -1691,15 +1713,17 @@ class StockStore extends ChangeNotifier {
         _products.add(p);
         newProductsCount++;
         final qty = (item['onHand'] as int?) ?? p.opening;
-        if (qty > 0) {
+        final hasMovementsInRecord =
+            importMovements &&
+            record['movements'] is List &&
+            (record['movements'] as List).any((m) => m['productId'] == p.id);
+        if (qty > 0 && !hasMovementsInRecord) {
           _movement(p, 'Opening stock', qty, 'Merged from ${record['shop']}');
         }
       }
     }
 
-    if (importMovements &&
-        record['kind'] == 'Day record' &&
-        record['movements'] is List) {
+    if (importMovements && record['movements'] is List) {
       for (final item in record['movements']) {
         final m = _convertMovement(
           Movement.fromJson(Map<String, dynamic>.from(item)),
@@ -1780,13 +1804,17 @@ class StockStore extends ChangeNotifier {
         } else {
           newProductsCount++;
           final initialQty = (item['onHand'] as int?) ?? p.opening;
+          final hasMovementsInRecord =
+              importMovements &&
+              record['movements'] is List &&
+              (record['movements'] as List).any((m) => m['productId'] == p.id);
           final change = {
             'productId': p.id,
             'name': p.name,
             'unit': p.unit,
             'currentStock': 0,
-            'delta': initialQty,
-            'newStock': initialQty,
+            'delta': hasMovementsInRecord ? 0 : initialQty,
+            'newStock': hasMovementsInRecord ? 0 : initialQty,
             'isNew': true,
           };
           stockChanges.add(change);
@@ -1795,9 +1823,7 @@ class StockStore extends ChangeNotifier {
       }
     }
 
-    if (importMovements &&
-        record['kind'] == 'Day record' &&
-        record['movements'] is List) {
+    if (importMovements && record['movements'] is List) {
       final movementDeltas = <String, int>{};
       for (final item in record['movements']) {
         final m = Movement.fromJson(Map<String, dynamic>.from(item));

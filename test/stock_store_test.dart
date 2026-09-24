@@ -82,6 +82,24 @@ void main() {
     await store.saveProduct(item(price: 900));
     expect(store.revenue(DateTime.now()), 900);
   });
+  test(
+    'fixed checkout discount reduces saved revenue across sale lines',
+    () async {
+      final coffee = item(price: 450);
+      final tea = item(id: 'p2', name: 'Tea', code: 'second', price: 250);
+      await store.saveProduct(coffee);
+      await store.saveProduct(tea);
+
+      final cart = SaleCart()
+        ..add(coffee, coffee.defaultUnit)
+        ..add(tea, tea.defaultUnit);
+      await store.checkoutSale(cart, 'Discounted sale', discount: 200);
+
+      final sale = store.movements.where((m) => m.type == 'Sale').toList();
+      expect(sale.map(store.saleTotal).reduce((a, b) => a + b), 500);
+      expect(store.revenue(DateTime.now()), 500);
+    },
+  );
   test('count freezes stock changes and requires all entries', () async {
     await store.saveProduct(item());
     await store.saveProduct(item(id: 'p2', code: 'second'));

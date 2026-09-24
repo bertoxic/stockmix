@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'calculator.dart';
 import 'design.dart';
 import 'forms.dart';
 import 'pages.dart';
@@ -65,6 +66,7 @@ class _ScannerPageState extends State<ScannerPage> {
   String? lastCode;
   DateTime? lastScannedAt;
   bool selectingUnit = false;
+  int discount = 0;
 
   bool get isMultiItem =>
       widget.mode == ScannerMode.multiItem && widget.store != null;
@@ -91,6 +93,8 @@ class _ScannerPageState extends State<ScannerPage> {
   }
 
   int get totalCost => cart.total;
+
+  int get netTotal => totalCost - discount;
 
   int get totalUnits => cart.totalBaseUnits;
 
@@ -312,23 +316,115 @@ class _ScannerPageState extends State<ScannerPage> {
   Future<void> checkoutDirectly() async {
     if (cart.isEmpty || widget.store == null) return;
     final store = widget.store!;
-    final total = totalCost;
-    final accepted = await confirm(
-      context,
-      'Record cash received?',
-      'Confirm you received ${money(store, total)}. This will save the sale and deduct $totalUnits units from stock.',
-      action: 'Cash received',
+    var pendingDiscount = discount;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          title: const Text('Record cash received?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Confirm you received ${money(store, totalCost - pendingDiscount)}. This will save the sale and deduct $totalUnits units from stock.',
+              ),
+              if (pendingDiscount > 0) ...[
+                const SizedBox(height: 12),
+                Text('Discount: −${money(store, pendingDiscount)}'),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                final entered = TextEditingController(
+                  text: pendingDiscount == 0
+                      ? ''
+                      : (pendingDiscount / 100).toStringAsFixed(2),
+                );
+                final value = await showDialog<int>(
+                  context: ctx,
+                  builder: (discountContext) => AlertDialog(
+                    title: const Text('Add discount'),
+                    content: TextField(
+                      controller: entered,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Discount amount',
+                        hintText: '0.00',
+                        helperText:
+                            'Enter the cash amount to subtract, not a percentage.',
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(discountContext),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          final number = double.tryParse(entered.text.trim());
+                          if (number == null ||
+                              number < 0 ||
+                              number * 100 > totalCost) {
+                            showMessage(
+                              discountContext,
+                              'Enter an amount from 0 to ${money(store, totalCost)}.',
+                            );
+                            return;
+                          }
+                          Navigator.pop(
+                            discountContext,
+                            (number * 100).round(),
+                          );
+                        },
+                        child: const Text('Apply discount'),
+                      ),
+                    ],
+                  ),
+                );
+                entered.dispose();
+                if (value != null) update(() => pendingDiscount = value);
+              },
+              icon: const Icon(Icons.sell_outlined, size: 18),
+              label: Text(
+                pendingDiscount == 0 ? 'Add discount' : 'Edit discount',
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Cash received'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (!accepted || !mounted) return;
+    if (accepted != true || !mounted) return;
+    setState(() => discount = pendingDiscount);
 
     try {
       final soldCart = cart.copy();
-      final recordedTotal = total;
+      final recordedTotal = netTotal;
       final saleTime = DateTime.now();
-      final receiptRef = await store.checkoutSale(soldCart, '');
+      final receiptRef = await store.checkoutSale(
+        soldCart,
+        '',
+        discount: discount,
+      );
       if (!mounted) return;
 
-      setState(() => cart.clear());
+      setState(() {
+        cart.clear();
+        discount = 0;
+      });
       _notifyCartChanged();
 
       await showDialog<void>(
@@ -522,6 +618,11 @@ class _ScannerPageState extends State<ScannerPage> {
           ),
           title: Text(widget.title ?? 'Scan into sale'),
           actions: [
+            IconButton(
+              tooltip: 'Calculator',
+              onPressed: () => showCalculator(context),
+              icon: const Icon(Icons.calculate_outlined),
+            ),
             if (cameraSupported)
               IconButton(
                 tooltip: flashOn ? 'Turn off flash' : 'Turn on flash',
@@ -871,7 +972,9 @@ class _ScannerPageState extends State<ScannerPage> {
                                             ? Icons.delete_outline
                                             : Icons.remove_circle_outline,
                                         size: 20,
-                                        color: qty == 1 ? context.stockRust : context.stockInk,
+                                        color: qty == 1
+                                            ? context.stockRust
+                                            : context.stockInk,
                                       ),
                                       onPressed: () => _decrement(line),
                                     ),
@@ -993,7 +1096,10 @@ class _ScannerPageState extends State<ScannerPage> {
                           ),
                           Text(
                             '$totalUnits ${totalUnits == 1 ? 'unit' : 'units'}',
-                            style: TextStyle(fontSize: 11, color: context.stockMuted),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.stockMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -1218,13 +1324,20 @@ class _UnitChoiceButton extends StatelessWidget {
               '1 ${unit.name}',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                color: enabled ? (selected ? plum : context.stockInk) : context.stockMuted,
+                color: enabled
+                    ? (selected ? plum : context.stockInk)
+                    : context.stockMuted,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               price,
-              style: TextStyle(fontSize: 12, color: enabled ? (selected ? plum : context.stockInk) : context.stockMuted),
+              style: TextStyle(
+                fontSize: 12,
+                color: enabled
+                    ? (selected ? plum : context.stockInk)
+                    : context.stockMuted,
+              ),
             ),
           ],
         ),

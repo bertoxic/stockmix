@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'calculator.dart';
 import 'backup_page.dart';
 import 'design.dart';
 import 'forms.dart';
@@ -75,7 +76,6 @@ class _ReceiptSearchDialogState extends State<_ReceiptSearchDialog> {
 class _StockShellState extends State<StockShell> {
   int tab = 0;
   String search = '', category = 'All items';
-  bool lowOnly = false;
   DateTime day = DateTime.now();
   int recordsMode = 0;
   // Sales and customer refunds are the primary day-to-day view.
@@ -90,6 +90,61 @@ class _StockShellState extends State<StockShell> {
   void initState() {
     super.initState();
   }
+
+  Future<void> _showCategoryPicker(List<String> categories) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => Dialog(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(dialogContext).height * .5,
+        width: 360,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Categories',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: context.stockLine, height: 1),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final selectedCategory = categories[index];
+                  final selected = category == selectedCategory;
+                  return ListTile(
+                    title: Text(selectedCategory),
+                    selected: selected,
+                    trailing: selected ? const Icon(Icons.check) : null,
+                    onTap: () {
+                      setState(() => category = selectedCategory);
+                      Navigator.pop(dialogContext);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   Future<void> _showFirstTimeSetup() async {
     final name = TextEditingController(
@@ -419,8 +474,12 @@ class _StockShellState extends State<StockShell> {
     setState(() {
       tab = value;
       // The inventory field is rebuilt when its tab is left. Clear the
-      // matching state too so its invisible old query cannot filter stock.
-      if (value != 1) search = '';
+      // matching and category-filter state too so they cannot affect stock
+      // when the user returns.
+      if (value != 1) {
+        search = '';
+        category = 'All items';
+      }
     });
   }
 
@@ -642,8 +701,12 @@ class _StockShellState extends State<StockShell> {
           ],
         ),
       ),
-      const Tag('On this device', color: Color(0xFF62643B)),
-      const SizedBox(width: 10),
+      IconButton(
+        tooltip: 'Calculator',
+        onPressed: () => showCalculator(context),
+        icon: const Icon(Icons.calculate_outlined),
+      ),
+      const SizedBox(width: 6),
       InkWell(
         borderRadius: BorderRadius.circular(15),
         onTap: () => _selectTab(3),
@@ -765,7 +828,10 @@ class _StockShellState extends State<StockShell> {
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => setState(() => hideTodaySales = !hideTodaySales),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: Icon(
                     hideTodaySales
                         ? Icons.visibility_off_outlined
@@ -807,7 +873,9 @@ class _StockShellState extends State<StockShell> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                hideTodaySales ? '••••••••' : money(store, store.revenue(today)),
+                hideTodaySales
+                    ? '••••••••'
+                    : money(store, store.revenue(today)),
                 style: const TextStyle(
                   color: paper,
                   fontSize: 43,
@@ -942,31 +1010,18 @@ class _StockShellState extends State<StockShell> {
           ),
         ),
       Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'A good day to\nkeep things in order.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineLarge?.copyWith(height: 1.12),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  DateFormat('EEEE, d MMMM').format(today),
-                  style: TextStyle(color: context.stockMuted, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
           if (wide)
             const Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(right: 12),
               child: Icon(Icons.wb_sunny_outlined, color: maple, size: 44),
             ),
+          Text(
+            DateFormat('EEEE, d MMMM').format(today),
+            style: TextStyle(color: context.stockMuted, fontSize: 13),
+          ),
         ],
       ),
       const SizedBox(height: 25),
@@ -1330,13 +1385,17 @@ class _StockShellState extends State<StockShell> {
   List<Widget> inventory(bool wide) {
     final categories = [
       'All items',
-      ...store.products.map((p) => p.category).toSet(),
+      ...store.products
+          .map((p) => p.category.trim())
+          .where((category) => category.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort(),
     ];
     final filtered = store.products
         .where(
           (p) =>
-              (category == 'All items' || p.category == category) &&
-              (!lowOnly || store.stock(p) <= p.threshold) &&
+              (category == 'All items' || p.category.trim() == category) &&
               '${p.name} ${p.barcode} ${p.category}'.toLowerCase().contains(
                 search.toLowerCase(),
               ),
@@ -1391,28 +1450,30 @@ class _StockShellState extends State<StockShell> {
         ),
       ),
       const SizedBox(height: 17),
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final c in categories)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(
-                    c,
-                    style: TextStyle(
-                      color: category == c ? paper : context.stockMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  selected: category == c,
-                  showCheckmark: false,
-                  onSelected: (_) => setState(() => category = c),
-                ),
+      Wrap(
+        spacing: 8,
+        children: [
+          ChoiceChip(
+            label: Text(
+              'All items',
+              style: TextStyle(
+                color: category == 'All items' ? paper : context.stockMuted,
+                fontSize: 12,
               ),
-          ],
-        ),
+            ),
+            selected: category == 'All items',
+            showCheckmark: false,
+            onSelected: (_) => setState(() => category = 'All items'),
+          ),
+          ActionChip(
+            avatar: const Icon(Icons.category_outlined, size: 16),
+            label: Text(
+              category == 'All items' ? 'Categories' : category,
+              style: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () => _showCategoryPicker(categories),
+          ),
+        ],
       ),
       const SizedBox(height: 8),
       Wrap(
@@ -1435,21 +1496,15 @@ class _StockShellState extends State<StockShell> {
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              FilterChip(
-                label: const Text('Low stock', style: TextStyle(fontSize: 11)),
-                selected: lowOnly,
-                selectedColor: avocado,
-                onSelected: (v) => setState(() => lowOnly = v),
-              ),
               if (store.low.isNotEmpty)
                 ActionChip(
                   avatar: const Icon(
                     Icons.playlist_add_check_outlined,
                     size: 16,
                   ),
-                  label: Text(
-                    'Shopping list (${store.low.length})',
-                    style: const TextStyle(fontSize: 11),
+                  label: const Text(
+                    'Low stock',
+                    style: TextStyle(fontSize: 11),
                   ),
                   onPressed: () => open(ReorderPage(store: store)),
                 ),
@@ -1772,8 +1827,9 @@ class _StockShellState extends State<StockShell> {
                     : context.stockMuted,
               ),
               style: IconButton.styleFrom(
-                backgroundColor:
-                    dailyActivityFilter == 1 ? avocado : context.stockPaper,
+                backgroundColor: dailyActivityFilter == 1
+                    ? avocado
+                    : context.stockPaper,
                 side: BorderSide(color: context.stockLine),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),

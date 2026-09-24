@@ -989,7 +989,7 @@ class _ProductFormState extends State<ProductForm> {
               if (widget.store.showExpiryDateField || expiryDate != null) ...[
                 const SizedBox(height: 14),
                 Material(
-                  color: context.stockPaper,
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),

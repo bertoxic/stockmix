@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'calculator.dart';
 import 'design.dart';
 import 'invoice_page.dart';
 import 'pages.dart';
@@ -25,6 +26,7 @@ class _SalePageState extends State<SalePage> {
   final note = TextEditingController();
   String query = '';
   bool saving = false;
+  int discount = 0;
   StockStore get store => widget.store;
 
   List<Product> get _filteredProducts {
@@ -98,7 +100,107 @@ class _SalePageState extends State<SalePage> {
     }
   }
 
-  int get total => cart.total;
+  int get subtotal => cart.total;
+  int get total => subtotal - discount;
+
+  Future<int?> _promptDiscount() async {
+    final amount = TextEditingController(
+      text: discount == 0 ? '' : (discount / 100).toStringAsFixed(2),
+    );
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add discount'),
+        content: TextField(
+          controller: amount,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Discount amount',
+            hintText: '0.00',
+            helperText: 'Enter the cash amount to subtract, not a percentage.',
+          ),
+        ),
+        actions: [
+          if (discount > 0)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 0),
+              child: const Text('Remove discount'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final parsed = double.tryParse(amount.text.trim());
+              if (parsed == null || parsed < 0 || parsed * 100 > subtotal) {
+                showMessage(
+                  ctx,
+                  'Enter an amount from 0 to ${money(store, subtotal)}.',
+                );
+                return;
+              }
+              Navigator.pop(ctx, (parsed * 100).round());
+            },
+            child: const Text('Apply discount'),
+          ),
+        ],
+      ),
+    );
+    amount.dispose();
+    return result;
+  }
+
+  Future<bool> _confirmCashReceived() async {
+    var pendingDiscount = discount;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          title: const Text('Record cash received?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Confirm you received ${money(store, subtotal - pendingDiscount)}. This will save the sale and deduct ${cart.totalBaseUnits} base units from stock.',
+              ),
+              if (pendingDiscount > 0) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Discount: −${money(store, pendingDiscount)}',
+                  style: TextStyle(color: context.stockMuted),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                final value = await _promptDiscount();
+                if (value != null) update(() => pendingDiscount = value);
+              },
+              icon: const Icon(Icons.sell_outlined, size: 18),
+              label: Text(
+                pendingDiscount == 0 ? 'Add discount' : 'Edit discount',
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Cash received'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted == true && mounted) setState(() => discount = pendingDiscount);
+    return accepted == true;
+  }
 
   Future<void> _cancelActiveCount() async {
     final scope = store.count?['scope'] ?? 'All items';
@@ -123,24 +225,26 @@ class _SalePageState extends State<SalePage> {
   }
 
   Future<void> checkout() async {
-    final accepted = await confirm(
-      context,
-      'Record cash received?',
-      'Confirm you received ${money(store, total)}. This will save the sale and deduct ${cart.totalBaseUnits} base units from stock.',
-      action: 'Cash received',
-    );
+    final accepted = await _confirmCashReceived();
     if (!accepted || !mounted) return;
     setState(() => saving = true);
     try {
       final soldCart = cart.copy();
       final recordedTotal = total;
+      final recordedDiscount = discount;
+      final recordedNote = note.text;
       final saleTime = DateTime.now();
-      final receiptRef = await store.checkoutSale(soldCart, note.text);
+      final receiptRef = await store.checkoutSale(
+        soldCart,
+        note.text,
+        discount: discount,
+      );
       if (!mounted) return;
 
       setState(() {
         cart.clear();
         note.clear();
+        discount = 0;
       });
 
       await showDialog<void>(
@@ -168,7 +272,8 @@ class _SalePageState extends State<SalePage> {
                       cart: soldCart,
                       total: recordedTotal,
                       date: saleTime,
-                      note: note.text,
+                      note: recordedNote,
+                      discount: recordedDiscount,
                     ),
                   ),
                 );
@@ -264,6 +369,11 @@ class _SalePageState extends State<SalePage> {
         appBar: AppBar(
           title: const Text('New sale'),
           actions: [
+            IconButton(
+              onPressed: () => showCalculator(context),
+              tooltip: 'Calculator',
+              icon: const Icon(Icons.calculate_outlined),
+            ),
             if (cart.isNotEmpty)
               TextButton.icon(
                 onPressed: _holdCurrentSale,
@@ -653,30 +763,57 @@ class _SalePageState extends State<SalePage> {
                 const SizedBox(height: 18),
                 Surface(
                   color: avocado,
-                  child: Row(
+                  child: Column(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'Total',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Total',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
+                          Text(
+                            money(store, total),
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        money(store, total),
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
+                      if (discount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Discount −${money(store, discount)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'Before ${money(store, subtotal)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.stockMuted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Cash recording only. Prices are final; no additional tax or discounts are applied.',
+                  'Cash recording only. Add a fixed discount when confirming cash received.',
                   style: TextStyle(
                     fontSize: 11,
                     color: context.stockMuted,
