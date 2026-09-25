@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:collection';
+import 'dart:ui' show Locale;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -423,7 +424,7 @@ class Movement {
 
 class StockStore extends ChangeNotifier {
   final Future<void> Function(Map<String, dynamic>) persist;
-  StockStore({required this.persist});
+  StockStore({required this.persist, this.hasCompletedOnboarding = true});
   List<Product> _products = [];
   List<Movement> _movements = [];
   List<Map<String, dynamic>> _received = [];
@@ -432,6 +433,7 @@ class StockStore extends ChangeNotifier {
   String shop = 'My store', currency = 'USD';
   String userName = '';
   bool setupCompleted = false;
+  bool hasCompletedOnboarding;
   String? lastBackupAt;
   bool busy = false;
   bool soundEnabled = true;
@@ -441,6 +443,12 @@ class StockStore extends ChangeNotifier {
   bool showExpiryDateField = false;
   bool showItemLabels = false;
   List<String> itemLabels = [];
+  String? languageCode;
+
+  Locale? get locale =>
+      (languageCode != null && languageCode != 'system' && languageCode!.trim().isNotEmpty)
+          ? Locale(languageCode!.trim())
+          : null;
 
   List<Product> get products => List.unmodifiable(_products);
   List<Movement> get movements => List.unmodifiable(_movements);
@@ -465,7 +473,11 @@ class StockStore extends ChangeNotifier {
       },
     );
     final data = await record.get(db);
-    if (data != null) store._restore(data);
+    if (data != null) {
+      store._restore(data);
+    } else {
+      store.hasCompletedOnboarding = false;
+    }
     return store;
   }
 
@@ -479,6 +491,7 @@ class StockStore extends ChangeNotifier {
     'userName': userName,
     'currency': currency,
     'setupCompleted': setupCompleted,
+    'hasCompletedOnboarding': hasCompletedOnboarding,
     'lastBackupAt': lastBackupAt,
     'soundEnabled': soundEnabled,
     'hapticsEnabled': hapticsEnabled,
@@ -487,6 +500,7 @@ class StockStore extends ChangeNotifier {
     'showExpiryDateField': showExpiryDateField,
     'showItemLabels': showItemLabels,
     'itemLabels': itemLabels,
+    'languageCode': languageCode,
   };
 
   void _restore(Map<String, dynamic> data) {
@@ -511,6 +525,10 @@ class StockStore extends ChangeNotifier {
     setupCompleted =
         data['setupCompleted'] ??
         (_products.isNotEmpty || _movements.isNotEmpty);
+    hasCompletedOnboarding =
+        data['hasCompletedOnboarding'] ??
+        (data['setupCompleted'] ??
+            (_products.isNotEmpty || _movements.isNotEmpty));
     lastBackupAt = data['lastBackupAt'];
     soundEnabled = data['soundEnabled'] ?? true;
     hapticsEnabled = data['hapticsEnabled'] ?? true;
@@ -522,6 +540,7 @@ class StockStore extends ChangeNotifier {
     itemLabels = cleanItemLabels(
       (data['itemLabels'] as List? ?? const []).whereType<String>(),
     );
+    languageCode = data['languageCode'];
   }
 
   Future<T> _commit<T>(T Function() change) async {
@@ -655,6 +674,22 @@ class StockStore extends ChangeNotifier {
         setupCompleted = true;
       });
 
+  Future<void> completeOnboarding({String? storeName, String? currencyCode}) =>
+      _commit(() {
+        if (storeName != null && storeName.trim().isNotEmpty) {
+          shop = storeName.trim();
+        }
+        if (currencyCode != null && _movements.isEmpty) {
+          currency = currencyCode;
+        }
+        setupCompleted = true;
+        hasCompletedOnboarding = true;
+      });
+
+  Future<void> resetOnboarding() => _commit(() {
+        hasCompletedOnboarding = false;
+      });
+
   Future<void> updateSettings({
     String? storeName,
     String? userName,
@@ -666,6 +701,7 @@ class StockStore extends ChangeNotifier {
     bool? showExpiryField,
     bool? showLabels,
     Iterable<String>? labels,
+    String? languageCode,
   }) => _commit(() {
     if (storeName != null && storeName.trim().isNotEmpty) {
       shop = storeName.trim();
@@ -681,6 +717,11 @@ class StockStore extends ChangeNotifier {
     if (showExpiryField != null) showExpiryDateField = showExpiryField;
     if (showLabels != null) showItemLabels = showLabels;
     if (labels != null) itemLabels = cleanItemLabels(labels);
+    if (languageCode != null) this.languageCode = languageCode;
+  });
+
+  Future<void> setLanguage(String? code) => _commit(() {
+    languageCode = code;
   });
 
   // --- Held Sales ---

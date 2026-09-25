@@ -5,6 +5,7 @@ import 'package:stockmix/core/services/media_service.dart';
 import 'package:stockmix/core/theme/design.dart';
 import 'package:stockmix/features/scanner/scanner_page.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 class PhotoInput extends StatefulWidget {
   final String? value;
@@ -77,7 +78,7 @@ class _PhotoInputState extends State<PhotoInput> {
                       color: Colors.black.withValues(alpha: 0.6),
                       shape: const CircleBorder(),
                       child: IconButton(
-                        tooltip: 'Remove photo',
+                        tooltip: context.l10n.removePhoto,
                         iconSize: 18,
                         visualDensity: VisualDensity.compact,
                         onPressed: () => widget.onChanged(null),
@@ -101,7 +102,7 @@ class _PhotoInputState extends State<PhotoInput> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Photo attached · $kb KB',
+                      '${context.l10n.photoAttached} · $kb KB',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -118,9 +119,9 @@ class _PhotoInputState extends State<PhotoInput> {
                           ? null
                           : () => pick(ImageSource.camera),
                       icon: const Icon(Icons.camera_alt_outlined, size: 15),
-                      label: const Text(
-                        'Camera',
-                        style: TextStyle(fontSize: 12),
+                      label: Text(
+                        context.l10n.takePhoto,
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                     TextButton.icon(
@@ -132,9 +133,9 @@ class _PhotoInputState extends State<PhotoInput> {
                           ? null
                           : () => pick(ImageSource.gallery),
                       icon: const Icon(Icons.photo_library_outlined, size: 15),
-                      label: const Text(
-                        'Upload',
-                        style: TextStyle(fontSize: 12),
+                      label: Text(
+                        context.l10n.uploadPhoto,
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
@@ -183,7 +184,7 @@ class _PhotoInputState extends State<PhotoInput> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Camera',
+                            context.l10n.camera,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -223,7 +224,7 @@ class _PhotoInputState extends State<PhotoInput> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Upload',
+                            context.l10n.upload,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -250,14 +251,14 @@ class _PhotoInputState extends State<PhotoInput> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Reading photo & detecting text…',
+                  context.l10n.detectingText,
                   style: TextStyle(fontSize: 11, color: context.stockMuted),
                 ),
               ],
             )
           else
             Text(
-              'Add a photo (optional) · Auto-detects item text & barcodes',
+              context.l10n.addPhotoPrompt,
               style: TextStyle(fontSize: 11, color: context.stockMuted),
             ),
         ],
@@ -342,16 +343,16 @@ class _ProductFormState extends State<ProductForm> {
     final scope = widget.store.count?['scope'] ?? 'All items';
     final shouldCancel = await confirm(
       context,
-      'Cancel active stock count?',
-      'This will discard the saved count entries for $scope. Your inventory will stay unchanged, and you can add items again.',
-      action: 'Cancel count',
+      context.l10n.cancelActiveStockCountTitle,
+      context.l10n.cancelActiveStockCountMessage(scope),
+      action: context.l10n.cancelCountAction,
     );
     if (!shouldCancel) return;
     try {
       await widget.store.cancelCount();
       if (mounted) {
         setState(() {});
-        showMessage(context, 'Stock count cancelled. You can add items again.');
+        showMessage(context, context.l10n.stockCountCancelledMsg);
       }
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
@@ -384,14 +385,14 @@ class _ProductFormState extends State<ProductForm> {
       int.tryParse(value ?? '') == null ||
           int.parse(value!) < 0 ||
           int.parse(value) > 100000000
-      ? 'Enter a whole number, 0–100 million'
+      ? context.l10n.wholeNumberValidation
       : null;
   String? money(String? value) {
     try {
       parseMoney(value ?? '');
       return null;
     } catch (_) {
-      return 'Use a valid price, e.g. 12.50';
+      return context.l10n.validPriceValidation;
     }
   }
 
@@ -457,25 +458,25 @@ class _ProductFormState extends State<ProductForm> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: rust),
-              SizedBox(width: 8),
-              Text('Cost higher than price'),
+              const Icon(Icons.warning_amber_rounded, color: rust),
+              const SizedBox(width: 8),
+              Text(context.l10n.costHigherThanPrice),
             ],
           ),
-          content: const Text(
-            'The cost price is higher than the selling price, which means this item will be sold at a loss.\n\nAre you sure you want to save?',
+          content: Text(
+            context.l10n.costHigherThanPriceMessage,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel & Edit'),
+              child: Text(context.l10n.cancelAndEdit),
             ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: rust),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save anyway'),
+              child: Text(context.l10n.saveAnyway),
             ),
           ],
         ),
@@ -510,8 +511,8 @@ class _ProductFormState extends State<ProductForm> {
         showMessage(
           context,
           widget.product == null
-              ? 'Item added to your stock book.'
-              : 'Item updated.',
+              ? context.l10n.itemAddedToStockBook
+              : context.l10n.itemUpdated,
         );
       }
     } catch (e) {
@@ -574,7 +575,7 @@ class _ProductFormState extends State<ProductForm> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.product == null ? 'Add an item' : 'Edit item'),
+      title: Text(widget.product == null ? context.l10n.addAnItem : context.l10n.editItem),
     ),
     body: Center(
       child: ConstrainedBox(
@@ -586,13 +587,13 @@ class _ProductFormState extends State<ProductForm> {
             children: [
               Text(
                 widget.product == null
-                    ? 'Make room for something new.'
-                    : 'The little details.',
+                    ? context.l10n.makeRoomForNew
+                    : context.l10n.theLittleDetails,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'A clear name, a price, and you’re ready to go.',
+                context.l10n.clearNamePriceReady,
                 style: TextStyle(color: context.stockMuted),
               ),
               if (_addingBlockedByCount) ...[
@@ -609,17 +610,17 @@ class _ProductFormState extends State<ProductForm> {
                             color: context.stockRust,
                           ),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Adding items is paused',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                              context.l10n.addingItemsPaused,
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'A stock count is active for ${widget.store.count?['scope'] ?? 'All items'}, so new items are paused to keep the count accurate. To finish it, go to More → Stock count, count the remaining items (use 0 where needed), then review and post it.',
+                        context.l10n.stockCountActiveNotice(widget.store.count?['scope'] ?? 'All items'),
                         style: TextStyle(
                           fontSize: 12,
                           color: context.stockMuted,
@@ -630,7 +631,7 @@ class _ProductFormState extends State<ProductForm> {
                       OutlinedButton.icon(
                         onPressed: _cancelActiveCount,
                         icon: const Icon(Icons.cancel_outlined, size: 18),
-                        label: const Text('Cancel active count'),
+                        label: Text(context.l10n.cancelActiveCount),
                       ),
                     ],
                   ),
@@ -646,7 +647,7 @@ class _ProductFormState extends State<ProductForm> {
                     if (name.text.trim().isEmpty) {
                       name.text = lines.first;
                       nameSuggestions = lines.skip(1).take(6).toList();
-                      showMessage(context, 'Auto-filled item name from photo');
+                      showMessage(context, context.l10n.autoFilledNamePhoto);
                     } else {
                       nameSuggestions = lines.take(6).toList();
                     }
@@ -657,9 +658,9 @@ class _ProductFormState extends State<ProductForm> {
               TextFormField(
                 controller: name,
                 maxLength: 100,
-                decoration: const InputDecoration(labelText: 'Item name'),
+                decoration: InputDecoration(labelText: context.l10n.itemName),
                 validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Give this item a name'
+                    ? context.l10n.giveItemName
                     : null,
               ),
               if (nameSuggestions.isNotEmpty) ...[
@@ -669,7 +670,7 @@ class _ProductFormState extends State<ProductForm> {
                     const Icon(Icons.auto_awesome, size: 14, color: avocado),
                     const SizedBox(width: 6),
                     Text(
-                      'Detected from photo (tap to use):',
+                      context.l10n.detectedFromPhoto,
                       style: TextStyle(
                         fontSize: 11,
                         color: context.stockMuted,
@@ -680,7 +681,7 @@ class _ProductFormState extends State<ProductForm> {
                     InkWell(
                       onTap: () => setState(() => nameSuggestions.clear()),
                       child: Text(
-                        'Dismiss',
+                        context.l10n.dismiss,
                         style: TextStyle(
                           fontSize: 11,
                           color: context.stockMuted,
@@ -718,9 +719,9 @@ class _ProductFormState extends State<ProductForm> {
                 controller: code,
                 maxLength: 250,
                 decoration: InputDecoration(
-                  labelText: 'Barcode / item code',
+                  labelText: context.l10n.barcodeItemCode,
                   suffixIcon: IconButton(
-                    tooltip: 'Scan barcode',
+                    tooltip: context.l10n.scanBarcode,
                     onPressed: () async {
                       final result = await Navigator.push<String>(
                         context,
@@ -743,7 +744,7 @@ class _ProductFormState extends State<ProductForm> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Selling price (${widget.store.currency})',
+                        labelText: context.l10n.sellingPriceWithCurrency(widget.store.currency),
                       ),
                       validator: money,
                     ),
@@ -756,8 +757,8 @@ class _ProductFormState extends State<ProductForm> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Cost price',
+                      decoration: InputDecoration(
+                        labelText: context.l10n.costPriceLabel,
                       ),
                       validator: money,
                     ),
@@ -782,7 +783,7 @@ class _ProductFormState extends State<ProductForm> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Warning: Cost price is higher than selling price (selling at a loss).',
+                          context.l10n.sellingAtLossWarning,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -799,7 +800,7 @@ class _ProductFormState extends State<ProductForm> {
                 TextFormField(
                   controller: quantity,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Opening stock'),
+                  decoration: InputDecoration(labelText: context.l10n.openingStock),
                   validator: number,
                 ),
                 const SizedBox(height: 20),
@@ -816,8 +817,8 @@ class _ProductFormState extends State<ProductForm> {
                           focusNode: categoryFocus,
                           maxLength: 40,
                           onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
+                          decoration: InputDecoration(
+                            labelText: context.l10n.categoryLabel,
                           ),
                         ),
                         if (categoryFocus.hasFocus &&
@@ -875,13 +876,13 @@ class _ProductFormState extends State<ProductForm> {
                         maxLength: 12,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          labelText: 'Unit (pcs, box…)',
+                          labelText: context.l10n.unitPcsBox,
                           prefixIcon: IconButton(
                             icon: const Icon(
                               Icons.chevron_left_rounded,
                               size: 20,
                             ),
-                            tooltip: 'Previous unit',
+                            tooltip: context.l10n.previousUnit,
                             visualDensity: VisualDensity.compact,
                             onPressed: () => _cycleUnit(-1),
                           ),
@@ -890,7 +891,7 @@ class _ProductFormState extends State<ProductForm> {
                               Icons.chevron_right_rounded,
                               size: 20,
                             ),
-                            tooltip: 'Next unit',
+                            tooltip: context.l10n.nextUnit,
                             visualDensity: VisualDensity.compact,
                             onPressed: () => _cycleUnit(1),
                           ),
@@ -903,11 +904,11 @@ class _ProductFormState extends State<ProductForm> {
               const SizedBox(height: 14),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Sell this item by pack too'),
+                title: Text(context.l10n.sellByPackToo),
                 subtitle: Text(
                   sellsByPack
-                      ? 'Stock stays in ${unit.text.trim().isEmpty ? 'base units' : unit.text.trim()}; a pack deducts several at once.'
-                      : 'Turn on for medicines sold as both a loose unit and a pack.',
+                      ? context.l10n.sellByPackSubtitleOn(unit.text.trim().isEmpty ? context.l10n.baseUnit : unit.text.trim())
+                      : context.l10n.sellByPackSubtitleOff,
                   style: TextStyle(fontSize: 11, color: context.stockMuted),
                 ),
                 value: sellsByPack,
@@ -925,15 +926,14 @@ class _ProductFormState extends State<ProductForm> {
                         controller: packSize,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText:
-                              '${unit.text.trim().isEmpty ? 'Base units' : unit.text.trim()} per Pack',
+                          labelText: context.l10n.baseUnitsPerPack(unit.text.trim().isEmpty ? context.l10n.baseUnit : unit.text.trim()),
                         ),
                         validator: (value) {
                           final parsed = int.tryParse(value ?? '');
                           if (parsed == null ||
                               parsed < 2 ||
                               parsed > 1000000) {
-                            return 'Enter 2–1,000,000';
+                            return context.l10n.enterPackRange(2, 1000000);
                           }
                           return null;
                         },
@@ -947,7 +947,7 @@ class _ProductFormState extends State<ProductForm> {
                           decimal: true,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'Pack price (${widget.store.currency})',
+                          labelText: context.l10n.packPriceWithCurrency(widget.store.currency),
                         ),
                         validator: money,
                       ),
@@ -961,11 +961,11 @@ class _ProductFormState extends State<ProductForm> {
                       value: 'base',
                       label: Text(
                         unit.text.trim().isEmpty
-                            ? 'Base unit'
+                            ? context.l10n.baseUnit
                             : unit.text.trim(),
                       ),
                     ),
-                    const ButtonSegment(value: 'pack', label: Text('Pack')),
+                    ButtonSegment(value: 'pack', label: Text(context.l10n.pack)),
                   ],
                   selected: {defaultSellingUnit},
                   onSelectionChanged: (selection) =>
@@ -973,7 +973,7 @@ class _ProductFormState extends State<ProductForm> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'This is preselected after scanning; staff can change it before adding.',
+                  context.l10n.preselectedAfterScan,
                   style: TextStyle(fontSize: 11, color: context.stockMuted),
                 ),
               ],
@@ -981,8 +981,8 @@ class _ProductFormState extends State<ProductForm> {
               TextFormField(
                 controller: threshold,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Low-stock alert at',
+                decoration: InputDecoration(
+                  labelText: context.l10n.reorderAlertAt,
                 ),
                 validator: number,
               ),
@@ -1022,13 +1022,13 @@ class _ProductFormState extends State<ProductForm> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Expiry date',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                Text(
+                                  context.l10n.expiryDate,
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
                                 Text(
                                   expiryDate == null
-                                      ? 'Not set'
+                                      ? context.l10n.notSet
                                       : DateFormat(
                                           'EEE, d MMM yyyy',
                                         ).format(expiryDate!),
@@ -1042,7 +1042,7 @@ class _ProductFormState extends State<ProductForm> {
                           ),
                           if (expiryDate != null)
                             IconButton(
-                              tooltip: 'Clear expiry date',
+                              tooltip: context.l10n.clearExpiryDate,
                               icon: const Icon(Icons.close),
                               onPressed: () =>
                                   setState(() => expiryDate = null),
@@ -1060,9 +1060,9 @@ class _ProductFormState extends State<ProductForm> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Label',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    Text(
+                      context.l10n.labelTag,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -1099,7 +1099,7 @@ class _ProductFormState extends State<ProductForm> {
               FilledButton.icon(
                 onPressed: saving || _addingBlockedByCount ? null : save,
                 icon: const Icon(Icons.check),
-                label: Text(saving ? 'Saving…' : 'Save item'),
+                label: Text(saving ? context.l10n.savingEllipsis : context.l10n.saveItem),
               ),
               const SizedBox(height: 24),
             ],
@@ -1155,11 +1155,11 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
   Future<void> save() async {
     final qty = int.tryParse(quantity.text);
     if (qty == null || qty <= 0 || qty * unitMultiplier > 100000000) {
-      showMessage(context, 'Enter a positive whole quantity.');
+      showMessage(context, context.l10n.enterPositiveQuantity);
       return;
     }
     if (note.text.trim().isEmpty) {
-      showMessage(context, 'Add a supplier or a reason for the change.');
+      showMessage(context, context.l10n.addSupplierOrReason);
       return;
     }
     setState(() => saving = true);
@@ -1173,7 +1173,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
       );
       if (mounted) {
         Navigator.pop(context);
-        showMessage(context, 'Stock updated and saved on this device.');
+        showMessage(context, context.l10n.stockUpdatedSaved);
       }
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
@@ -1185,7 +1185,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.receiving ? 'Receive stock' : 'Adjust stock'),
+      title: Text(widget.receiving ? context.l10n.receiveStockTitle : context.l10n.adjustStockTitle),
     ),
     body: Center(
       child: ConstrainedBox(
@@ -1208,7 +1208,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          '${widget.store.stockLabel(widget.product)} on hand',
+                          '${widget.store.stockLabel(widget.product)} ${context.l10n.onHand.toLowerCase()}',
                           style: TextStyle(color: context.stockMuted),
                         ),
                       ],
@@ -1220,16 +1220,16 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
             const SizedBox(height: 24),
             if (!widget.receiving) ...[
               SegmentedButton<bool>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: false,
-                    label: Text('Remove stock'),
-                    icon: Icon(Icons.remove),
+                    label: Text(context.l10n.removeStock),
+                    icon: const Icon(Icons.remove),
                   ),
                   ButtonSegment(
                     value: true,
-                    label: Text('Add stock'),
-                    icon: Icon(Icons.add),
+                    label: Text(context.l10n.addStock),
+                    icon: const Icon(Icons.add),
                   ),
                 ],
                 selected: {add},
@@ -1242,7 +1242,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               DropdownButtonFormField<String>(
                 initialValue: reason,
                 key: ValueKey(add),
-                decoration: const InputDecoration(labelText: 'Reason'),
+                decoration: InputDecoration(labelText: context.l10n.reasonLabel),
                 items:
                     (add
                             ? ['Correction', 'Return restock']
@@ -1261,7 +1261,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
                     value: 'base',
                     label: Text(widget.product.unit),
                   ),
-                  const ButtonSegment(value: 'pack', label: Text('Pack')),
+                  ButtonSegment(value: 'pack', label: Text(context.l10n.pack)),
                 ],
                 selected: {adjustmentUnit},
                 onSelectionChanged: (selection) =>
@@ -1270,8 +1270,8 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               const SizedBox(height: 8),
               Text(
                 adjustmentUnit == 'pack'
-                    ? '1 Pack = ${widget.product.packSize} ${widget.product.unit}. Stock will be saved in ${widget.product.unit}.'
-                    : 'Stock will be saved in ${widget.product.unit}.',
+                    ? context.l10n.packRatioStockSaved(widget.product.packSize, widget.product.unit)
+                    : context.l10n.stockSavedIn(widget.product.unit),
                 style: TextStyle(fontSize: 11, color: context.stockMuted),
               ),
               const SizedBox(height: 16),
@@ -1280,8 +1280,7 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               controller: quantity,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText:
-                    'Quantity (${adjustmentUnit == 'pack' ? 'Packs' : widget.product.unit})',
+                labelText: context.l10n.quantityWithUnit(adjustmentUnit == 'pack' ? context.l10n.pack : widget.product.unit),
               ),
             ),
             const SizedBox(height: 20),
@@ -1291,8 +1290,8 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               maxLines: 3,
               decoration: InputDecoration(
                 labelText: widget.receiving
-                    ? 'Supplier / receipt note'
-                    : 'What happened?',
+                    ? context.l10n.supplierReceiptNote
+                    : context.l10n.whatHappened,
               ),
             ),
             const SizedBox(height: 20),
@@ -1305,10 +1304,10 @@ class _AdjustmentPageState extends State<AdjustmentPage> {
               onPressed: saving ? null : save,
               child: Text(
                 saving
-                    ? 'Saving…'
+                    ? context.l10n.savingEllipsis
                     : widget.receiving
-                    ? 'Confirm receipt'
-                    : 'Record adjustment',
+                    ? context.l10n.confirmReceipt
+                    : context.l10n.recordAdjustment,
               ),
             ),
           ],

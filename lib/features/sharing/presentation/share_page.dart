@@ -717,98 +717,114 @@ class _ReceivedPageState extends State<ReceivedPage> {
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                if (records.isEmpty)
-                  EmptyState(
-                    icon: Icons.move_to_inbox_outlined,
-                    title: filter == 0
-                        ? 'A place for shared records.'
-                        : 'No records in this filter.',
-                    subtitle: filter == 0
-                        ? 'Import a Stockmix file or complete a stock count to see it here.'
-                        : 'Try another filter to see more saved records.',
-                  ),
-                for (final r in records)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Material(
-                      color: context.stockPaper,
-                      borderRadius: BorderRadius.circular(20),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(18),
-                        leading: Icon(
-                          r['kind'] == 'Day record'
-                              ? Icons.receipt_long_outlined
-                              : Icons.inventory_2_outlined,
-                          color: r['kind'] == 'Day record'
-                              ? avocado
-                              : context.stockMuted,
-                        ),
-                        title: Text(
-                          '${r['kind']} · ${senderLabel(r)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        subtitle: Text(
-                          DateFormat(
-                            'd MMM yyyy · h:mm a',
-                          ).format(DateTime.parse(r['exportedAt']).toLocal()),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: context.stockMuted,
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'Delete record',
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: context.stockMuted,
-                                size: 20,
-                              ),
-                              onPressed: () async {
-                                if (await confirm(
-                                  context,
-                                  'Delete saved record?',
-                                  'This removes "${r['kind']} from ${senderLabel(r)}" from your saved records.',
-                                  action: 'Delete',
-                                )) {
-                                  try {
-                                    await widget.store.deleteReceived(r['id']);
-                                    if (context.mounted) {
-                                      showMessage(context, 'Record removed.');
-                                    }
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      showMessage(context, friendlyError(e));
-                                    }
-                                  }
-                                }
-                              },
-                            ),
-                            const Icon(Icons.chevron_right),
-                          ],
-                        ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SharedRecordPage(
-                              record: r,
-                              store: widget.store,
-                            ),
-                          ),
-                        ),
+            child: records.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      EmptyState(
+                        icon: Icons.move_to_inbox_outlined,
+                        title: filter == 0
+                            ? 'A place for shared records.'
+                            : 'No records in this filter.',
+                        subtitle: filter == 0
+                            ? 'Import a Stockmix file or complete a stock count to see it here.'
+                            : 'Try another filter to see more saved records.',
                       ),
-                    ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(24),
+                    itemCount: records.length,
+                    itemBuilder: (context, index) {
+                      final r = records[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Material(
+                          color: context.stockPaper,
+                          borderRadius: BorderRadius.circular(20),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.all(18),
+                            leading: Icon(
+                              r['kind'] == 'Day record'
+                                  ? Icons.receipt_long_outlined
+                                  : Icons.inventory_2_outlined,
+                              color: r['kind'] == 'Day record'
+                                  ? avocado
+                                  : context.stockMuted,
+                            ),
+                            title: Text(
+                              '${r['kind']} · ${senderLabel(r)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              DateFormat(
+                                'd MMM yyyy · h:mm a',
+                              ).format(
+                                DateTime.parse(r['exportedAt']).toLocal(),
+                              ),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.stockMuted,
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Delete record',
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: context.stockMuted,
+                                    size: 20,
+                                  ),
+                                  onPressed: () async {
+                                    if (await confirm(
+                                      context,
+                                      'Delete saved record?',
+                                      'This removes "${r['kind']} from ${senderLabel(r)}" from your saved records.',
+                                      action: 'Delete',
+                                    )) {
+                                      try {
+                                        await widget.store.deleteReceived(
+                                          r['id'],
+                                        );
+                                        if (context.mounted) {
+                                          showMessage(
+                                            context,
+                                            'Record removed.',
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          showMessage(
+                                            context,
+                                            friendlyError(e),
+                                          );
+                                        }
+                                      }
+                                    }
+                                  },
+                                ),
+                                const Icon(Icons.chevron_right),
+                              ],
+                            ),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SharedRecordPage(
+                                  record: r,
+                                  store: widget.store,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-              ],
-            ),
           ),
         );
       },

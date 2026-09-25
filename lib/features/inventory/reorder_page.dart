@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:stockmix/core/theme/design.dart';
 import 'package:stockmix/features/app/pages.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 class ReorderPage extends StatefulWidget {
   final StockStore store;
@@ -119,7 +120,7 @@ class _ReorderPageState extends State<ReorderPage> {
 
   Future<void> _shareOrder({Rect? origin}) async {
     if (_selected.isEmpty) {
-      showMessage(context, 'Select at least one item to share.');
+      showMessage(context, context.l10n.selectItemToShare);
       return;
     }
     final text = _formatSupplierList();
@@ -134,28 +135,31 @@ class _ReorderPageState extends State<ReorderPage> {
 
   Future<void> _receiveDelivery() async {
     if (_selected.isEmpty) {
-      showMessage(context, 'Select at least one item to receive.');
+      showMessage(context, context.l10n.selectItemToReceive);
       return;
     }
     final supplierCtrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Receive Delivery'),
+        title: Text(context.l10n.receiveDeliveryTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Receive $_totalSelectedUnits units across ${_selected.length} items into inventory now?',
+              context.l10n.receiveDeliveryConfirm(
+                _totalSelectedUnits,
+                _selected.length,
+              ),
               style: const TextStyle(height: 1.4),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: supplierCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Supplier name (optional)',
-                hintText: 'e.g. Metro Food Wholesalers',
+              decoration: InputDecoration(
+                labelText: context.l10n.supplierNameOptional,
+                hintText: context.l10n.supplierNameHint,
               ),
               textCapitalization: TextCapitalization.words,
             ),
@@ -164,11 +168,11 @@ class _ReorderPageState extends State<ReorderPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirm & Receive'),
+            child: Text(context.l10n.confirmAndReceive),
           ),
         ],
       ),
@@ -189,7 +193,7 @@ class _ReorderPageState extends State<ReorderPage> {
         if (mounted) {
           showMessage(
             context,
-            'Successfully received $receivedTotal units into stock.',
+            context.l10n.receivedSuccess(receivedTotal),
           );
           Navigator.pop(context);
         }
@@ -207,12 +211,12 @@ class _ReorderPageState extends State<ReorderPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shopping List'),
+        title: Text(context.l10n.shoppingList),
         actions: [
           if (lowProducts.isNotEmpty)
             Builder(
               builder: (btnCtx) => IconButton(
-                tooltip: 'Share order list',
+                tooltip: context.l10n.shareReorderList,
                 icon: const Icon(Icons.share_outlined),
                 onPressed: () {
                   final box = btnCtx.findRenderObject() as RenderBox?;
@@ -233,12 +237,11 @@ class _ReorderPageState extends State<ReorderPage> {
                   padding: const EdgeInsets.all(24),
                   child: EmptyState(
                     icon: Icons.check_circle_outline_rounded,
-                    title: 'All stocked up!',
-                    subtitle:
-                        'No items are currently at or below their low-stock threshold.',
+                    title: context.l10n.allStockedUpTitle,
+                    subtitle: context.l10n.allStockedUpSubtitle,
                     action: FilledButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Back to stock'),
+                      child: Text(context.l10n.backToStock),
                     ),
                   ),
                 ),
@@ -247,226 +250,244 @@ class _ReorderPageState extends State<ReorderPage> {
           : Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 800),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 90),
-                  children: [
-                    const Eyebrow('Restock & purchasing'),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Items running low.',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Quantities are suggested to reach double the threshold. Adjust as needed to share an order or receive deliveries.',
-                      style: TextStyle(
-                        color: context.stockMuted,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Summary header
-                    Surface(
-                      color: linen,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: _selected.length == lowProducts.length
-                                ? true
-                                : (_selected.isEmpty ? false : null),
-                            tristate: true,
-                            onChanged: (val) {
-                              setState(() {
-                                if (val == true) {
-                                  _selected.addAll(
-                                    lowProducts.map((p) => p.id),
-                                  );
-                                } else {
-                                  _selected.clear();
-                                }
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${_selected.length} of ${lowProducts.length} selected',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Eyebrow(context.l10n.restockAndPurchasing),
+                            const SizedBox(height: 8),
+                            Text(
+                              context.l10n.itemsRunningLow,
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              context.l10n.reorderQuantitySuggestions,
+                              style: TextStyle(
+                                color: context.stockMuted,
                                 fontSize: 13,
+                                height: 1.4,
                               ),
                             ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '$_totalSelectedUnits units',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13,
-                                ),
+                            const SizedBox(height: 20),
+
+                            // Summary header
+                            Surface(
+                              color: linen,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
                               ),
-                              if (_totalEstimatedCost > 0)
-                                Text(
-                                  'Est. ${money(store, _totalEstimatedCost)}',
-                                  style: TextStyle(
-                                    color: context.stockMuted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // List of items
-                    ...lowProducts.map((p) {
-                      final isSelected = _selected.contains(p.id);
-                      final onHand = store.stock(p);
-                      final qty = _quantities[p.id] ?? 1;
-                      final quantityController = _quantityController(p.id, qty);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Surface(
-                          color: isSelected ? paper : linen.withAlpha(120),
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Row(
                                 children: [
                                   Checkbox(
-                                    value: isSelected,
-                                    onChanged: (v) {
+                                    value: _selected.length == lowProducts.length
+                                        ? true
+                                        : (_selected.isEmpty ? false : null),
+                                    tristate: true,
+                                    onChanged: (val) {
                                       setState(() {
-                                        if (v == true) {
-                                          _selected.add(p.id);
+                                        if (val == true) {
+                                          _selected.addAll(
+                                            lowProducts.map((p) => p.id),
+                                          );
                                         } else {
-                                          _selected.remove(p.id);
+                                          _selected.clear();
                                         }
                                       });
                                     },
                                   ),
-                                  const SizedBox(width: 6),
-                                  ProductImage(p, size: 48),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          p.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          '${p.category}  ·  ${store.stockLabel(p)} left (min ${p.threshold})',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: onHand <= 0
-                                                ? context.stockRust
-                                                : context.stockMuted,
-                                            fontWeight: onHand <= 0
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
-                                      ],
+                                    child: Text(
+                                      context.l10n.selectedCountOfTotal(
+                                        _selected.length,
+                                        lowProducts.length,
+                                      ),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
                                     ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '$_totalSelectedUnits ${context.l10n.units}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      if (_totalEstimatedCost > 0)
+                                        Text(
+                                          context.l10n.estimatedTotal(
+                                            money(store, _totalEstimatedCost),
+                                          ),
+                                          style: TextStyle(
+                                            color: context.stockMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              const Divider(height: 18),
-                              Row(
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+                      sliver: SliverList.builder(
+                        itemCount: lowProducts.length,
+                        itemBuilder: (context, index) {
+                          final p = lowProducts[index];
+                          final isSelected = _selected.contains(p.id);
+                          final onHand = store.stock(p);
+                          final qty = _quantities[p.id] ?? 1;
+                          final quantityController =
+                              _quantityController(p.id, qty);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Surface(
+                              color: isSelected ? paper : linen.withAlpha(120),
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const SizedBox(width: 48),
-                                  Expanded(
-                                    child: Wrap(
-                                      spacing: 12,
-                                      runSpacing: 8,
-                                      alignment: WrapAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Order quantity:',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: context.stockMuted,
-                                          ),
-                                        ),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: context.stockLinen,
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.remove,
-                                                  size: 16,
-                                                ),
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                onPressed: qty > 1
-                                                    ? () => _setQuantity(
-                                                        p.id,
-                                                        qty - 1,
-                                                      )
-                                                    : null,
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Checkbox(
+                                        value: isSelected,
+                                        onChanged: (v) {
+                                          setState(() {
+                                            if (v == true) {
+                                              _selected.add(p.id);
+                                            } else {
+                                              _selected.remove(p.id);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 6),
+                                      ProductImage(p, size: 48),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              p.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
                                               ),
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              '${p.category}  ·  ${store.stockLabel(p)} left (min ${p.threshold})',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: onHand <= 0
+                                                    ? context.stockRust
+                                                    : context.stockMuted,
+                                                fontWeight: onHand <= 0
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 18),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 48),
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 12,
+                                          runSpacing: 8,
+                                          alignment: WrapAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            Text(
+                                              context.l10n.reorderQuantity,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: context.stockMuted,
+                                              ),
+                                            ),
+                                            Container(
+                                              decoration: BoxDecoration(
+                                                color: context.stockLinen,
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.remove,
+                                                      size: 16,
+                                                    ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    onPressed: qty > 1
+                                                        ? () => _setQuantity(
+                                                              p.id,
+                                                              qty - 1,
+                                                            )
+                                                        : null,
+                                                  ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
                                                       horizontal: 10,
                                                     ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    SizedBox(
-                                                      width: 40,
-                                                      child: TextField(
-                                                        key: ValueKey(
-                                                          'order-quantity-${p.id}',
-                                                        ),
-                                                        controller:
-                                                            quantityController,
-                                                        keyboardType:
-                                                            TextInputType
-                                                                .number,
-                                                        inputFormatters: [
-                                                          FilteringTextInputFormatter
-                                                              .digitsOnly,
-                                                        ],
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 13,
-                                                        ),
-                                                        decoration:
-                                                            const InputDecoration(
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        SizedBox(
+                                                          width: 40,
+                                                          child: TextField(
+                                                            key: ValueKey(
+                                                              'order-quantity-${p.id}',
+                                                            ),
+                                                            controller:
+                                                                quantityController,
+                                                            keyboardType:
+                                                                TextInputType
+                                                                    .number,
+                                                            inputFormatters: [
+                                                              FilteringTextInputFormatter
+                                                                  .digitsOnly,
+                                                            ],
+                                                            textAlign:
+                                                                TextAlign.center,
+                                                            style:
+                                                                const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize: 13,
+                                                            ),
+                                                            decoration:
+                                                                const InputDecoration(
                                                               isDense: true,
                                                               filled: true,
                                                               fillColor: Colors
@@ -484,80 +505,86 @@ class _ReorderPageState extends State<ReorderPage> {
                                                                   EdgeInsets
                                                                       .zero,
                                                             ),
-                                                        onChanged: (value) {
-                                                          final quantity =
-                                                              int.tryParse(
+                                                            onChanged: (value) {
+                                                              final quantity =
+                                                                  int.tryParse(
                                                                 value,
                                                               );
-                                                          if (quantity !=
-                                                              null) {
-                                                            _setQuantity(
-                                                              p.id,
-                                                              quantity,
-                                                            );
-                                                          }
-                                                        },
-                                                        onEditingComplete: () {
-                                                          if (int.tryParse(
-                                                                quantityController
-                                                                    .text,
-                                                              ) ==
-                                                              null) {
-                                                            _setQuantity(
-                                                              p.id,
-                                                              _quantities[p
-                                                                      .id] ??
-                                                                  1,
-                                                            );
-                                                          }
-                                                          FocusScope.of(
-                                                            context,
-                                                          ).unfocus();
-                                                        },
-                                                      ),
+                                                              if (quantity !=
+                                                                  null) {
+                                                                _setQuantity(
+                                                                  p.id,
+                                                                  quantity,
+                                                                );
+                                                              }
+                                                            },
+                                                            onEditingComplete: () {
+                                                              if (int.tryParse(
+                                                                    quantityController
+                                                                        .text,
+                                                                  ) ==
+                                                                  null) {
+                                                                _setQuantity(
+                                                                  p.id,
+                                                                  _quantities[p
+                                                                          .id] ??
+                                                                      1,
+                                                                );
+                                                              }
+                                                              FocusScope.of(
+                                                                context,
+                                                              ).unfocus();
+                                                            },
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          ' ${p.unit}',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 13,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                    Text(
-                                                      ' ${p.unit}',
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 13,
-                                                      ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.add,
+                                                      size: 16,
                                                     ),
-                                                  ],
-                                                ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    onPressed: () =>
+                                                        _setQuantity(
+                                                          p.id,
+                                                          qty + 1,
+                                                        ),
+                                                  ),
+                                                ],
                                               ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.add,
-                                                  size: 16,
-                                                ),
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                onPressed: () =>
-                                                    _setQuantity(p.id, qty + 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (p.cost > 0)
-                                          Text(
-                                            money(store, p.cost * qty),
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
                                             ),
-                                          ),
-                                      ],
-                                    ),
+                                            if (p.cost > 0)
+                                              Text(
+                                                money(store, p.cost * qty),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -592,7 +619,7 @@ class _ReorderPageState extends State<ReorderPage> {
                                     _shareOrder(origin: origin);
                                   },
                             icon: const Icon(Icons.share_outlined, size: 18),
-                            label: const Text('Share order'),
+                            label: Text(context.l10n.shareOrder),
                           ),
                         ),
                       ),
@@ -609,7 +636,9 @@ class _ReorderPageState extends State<ReorderPage> {
                             size: 18,
                           ),
                           label: Text(
-                            _working ? 'Receiving…' : 'Receive delivery',
+                            _working
+                                ? context.l10n.receivingEllipsis
+                                : context.l10n.receiveDelivery,
                           ),
                         ),
                       ),

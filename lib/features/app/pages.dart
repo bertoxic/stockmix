@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:stockmix/core/theme/design.dart';
 import 'package:stockmix/core/widgets/calculator.dart';
+import 'package:stockmix/core/widgets/native_ad_card.dart';
 import 'package:stockmix/features/inventory/forms.dart';
 import 'package:stockmix/features/inventory/reorder_page.dart';
+import 'package:stockmix/features/onboarding/onboarding_page.dart';
 import 'package:stockmix/features/sales/invoice_page.dart';
 import 'package:stockmix/features/sales/operations.dart';
 import 'package:stockmix/features/scanner/scanner_page.dart';
@@ -14,7 +16,9 @@ import 'package:stockmix/features/settings/settings_page.dart';
 import 'package:stockmix/features/sharing/presentation/share_page.dart';
 import 'package:stockmix/features/sharing/qr_stream/qr_stream_receiver_page.dart';
 import 'package:stockmix/features/sharing/qr_stream/qr_stream_sender_page.dart';
+import 'package:stockmix/features/stock/slow_moving_page.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 String money(StockStore store, int cents) =>
     NumberFormat.simpleCurrency(name: store.currency).format(cents / 100);
@@ -50,25 +54,25 @@ class _ReceiptSearchDialogState extends State<_ReceiptSearchDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Find receipt record'),
+    title: Text(context.l10n.findReceiptRecord),
     content: TextField(
       controller: _controller,
       autofocus: true,
-      decoration: const InputDecoration(
-        labelText: 'Receipt reference #',
+      decoration: InputDecoration(
+        labelText: context.l10n.receiptReference,
         hintText: 'e.g. REF-1234 or paste QR payload',
-        prefixIcon: Icon(Icons.receipt_long_outlined),
+        prefixIcon: const Icon(Icons.receipt_long_outlined),
       ),
       onSubmitted: (v) => Navigator.pop(context, v.trim()),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(context.l10n.cancel),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, _controller.text.trim()),
-        child: const Text('Find record'),
+        child: Text(context.l10n.findRecord),
       ),
     ],
   );
@@ -84,6 +88,9 @@ class _StockShellState extends State<StockShell> {
   int insightsDays = 7;
   bool showAllRecords = false;
   bool showAllInventory = false;
+  int inventoryDisplayLimit = 20;
+  int slowMoversDisplayLimit = 15;
+  int topSellersDisplayLimit = 10;
   bool hideTodaySales = false;
   StockStore get store => widget.store;
 
@@ -104,17 +111,17 @@ class _StockShellState extends State<StockShell> {
               padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Categories',
-                      style: TextStyle(
+                      context.l10n.categories,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Close',
+                    tooltip: context.l10n.close,
                     onPressed: () => Navigator.pop(dialogContext),
                     icon: const Icon(Icons.close),
                   ),
@@ -130,7 +137,7 @@ class _StockShellState extends State<StockShell> {
                   final selectedCategory = categories[index];
                   final selected = category == selectedCategory;
                   return ListTile(
-                    title: Text(selectedCategory),
+                    title: Text(selectedCategory == 'All items' ? context.l10n.allItems : selectedCategory),
                     selected: selected,
                     trailing: selected ? const Icon(Icons.check) : null,
                     onTap: () {
@@ -175,9 +182,9 @@ class _StockShellState extends State<StockShell> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Welcome to Stockmix',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              Text(
+                context.l10n.welcomeTitle,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -188,7 +195,7 @@ class _StockShellState extends State<StockShell> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Set up your store name and local currency. You can change this at any time in settings without affecting your product records.',
+                  context.l10n.welcomeSubtitle,
                   style: TextStyle(
                     color: context.stockMuted,
                     fontSize: 13,
@@ -200,17 +207,17 @@ class _StockShellState extends State<StockShell> {
                   controller: name,
                   maxLength: 60,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Store or shop name',
-                    hintText: 'e.g. Maya\'s Corner Grocery',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.storeNameLabel,
+                    hintText: context.l10n.storeNameHint,
                   ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: currency,
-                  decoration: const InputDecoration(
-                    labelText: 'Store currency',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.storeCurrencyLabel,
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -299,11 +306,11 @@ class _StockShellState extends State<StockShell> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Later'),
+              child: Text(context.l10n.later),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save'),
+              child: Text(context.l10n.save),
             ),
           ],
         ),
@@ -375,13 +382,13 @@ class _StockShellState extends State<StockShell> {
                 FilledButton.icon(
                   onPressed: () => Navigator.pop(sheetContext, 'send'),
                   icon: const Icon(Icons.qr_code_2_rounded),
-                  label: const Text('Send sale by QR'),
+                  label: Text(sheetContext.l10n.sendSaleQr),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () => Navigator.pop(sheetContext, 'receive'),
                   icon: const Icon(Icons.qr_code_scanner_rounded),
-                  label: const Text('Receive sale by QR'),
+                  label: Text(sheetContext.l10n.receiveSaleQr),
                 ),
               ],
             ),
@@ -432,7 +439,7 @@ class _StockShellState extends State<StockShell> {
     code ??= await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => const ScannerPage(title: 'Scan receipt QR'),
+        builder: (_) => ScannerPage(title: context.l10n.scanReceiptQr),
       ),
     );
     if (code == null || !mounted) return;
@@ -442,7 +449,7 @@ class _StockShellState extends State<StockShell> {
       final cleanRef = normalizeReceiptReference(code);
       showMessage(
         context,
-        'No sale record found for receipt reference "$cleanRef".',
+        context.l10n.noSaleFoundForRef(cleanRef),
       );
       return;
     }
@@ -606,7 +613,12 @@ class _StockShellState extends State<StockShell> {
                     size: 21,
                   ),
                   title: Text(
-                    ['Overview', 'Inventory', 'Day records', 'More'][i],
+                    [
+                      context.l10n.sidebarOverview,
+                      context.l10n.sidebarInventory,
+                      context.l10n.sidebarRecords,
+                      context.l10n.sidebarMore,
+                    ][i],
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: tab == i ? FontWeight.w800 : FontWeight.w500,
@@ -708,17 +720,20 @@ class _StockShellState extends State<StockShell> {
         icon: const Icon(Icons.calculate_outlined),
       ),
       const SizedBox(width: 6),
-      InkWell(
-        borderRadius: BorderRadius.circular(15),
-        onTap: () => _selectTab(3),
-        child: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: plum,
-            borderRadius: BorderRadius.circular(15),
+      Tooltip(
+        message: 'More tools & settings',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15),
+          onTap: () => _selectTab(3),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: plum,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(Icons.person_outline, color: linen, size: 22),
           ),
-          child: const Icon(Icons.person_outline, color: linen, size: 22),
         ),
       ),
     ],
@@ -734,8 +749,8 @@ class _StockShellState extends State<StockShell> {
         padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
         child: Row(
           children: [
-            navItem(0, Icons.grid_view_rounded, 'Home'),
-            navItem(1, Icons.inventory_2_outlined, 'Stock'),
+            navItem(0, Icons.grid_view_rounded, context.l10n.tabHome),
+            navItem(1, Icons.inventory_2_outlined, context.l10n.tabStock),
             Expanded(
               child: Semantics(
                 button: true,
@@ -759,8 +774,8 @@ class _StockShellState extends State<StockShell> {
                 ),
               ),
             ),
-            navItem(2, Icons.receipt_long_outlined, 'Records'),
-            navItem(3, Icons.tune_rounded, 'More'),
+            navItem(2, Icons.receipt_long_outlined, context.l10n.tabRecords),
+            navItem(3, Icons.tune_rounded, context.l10n.tabMore),
           ],
         ),
       ),
@@ -822,8 +837,8 @@ class _StockShellState extends State<StockShell> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Eyebrow('Today’s sales', color: Color(0xFFCCC5CB)),
+              Expanded(
+                child: Eyebrow(context.l10n.todaysSales, color: const Color(0xFFCCC5CB)),
               ),
               InkWell(
                 borderRadius: BorderRadius.circular(14),
@@ -849,13 +864,13 @@ class _StockShellState extends State<StockShell> {
                   color: Colors.white.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.circle, size: 6, color: avocado),
-                    SizedBox(width: 6),
+                    const Icon(Icons.circle, size: 6, color: avocado),
+                    const SizedBox(width: 6),
                     Text(
-                      'TODAY',
-                      style: TextStyle(
+                      context.l10n.todayCaps,
+                      style: const TextStyle(
                         color: avocado,
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -889,8 +904,8 @@ class _StockShellState extends State<StockShell> {
           const SizedBox(height: 8),
           Text(
             hideTodaySales
-                ? 'Amount hidden  ·  Tap to reveal'
-                : '$transactions ${transactions == 1 ? 'sale' : 'sales'} recorded  ·  ${sales.fold(0, (n, m) => n - m.delta)} items sold',
+                ? context.l10n.amountHiddenReveal
+                : '${transactions == 1 ? context.l10n.oneSaleRecorded : context.l10n.salesRecorded(transactions)}  ·  ${context.l10n.itemsSoldCount(sales.fold(0, (n, m) => n - m.delta))}',
             style: const TextStyle(color: Color(0xFFCFC6CD), fontSize: 12),
           ),
           const SizedBox(height: 22),
@@ -926,9 +941,9 @@ class _StockShellState extends State<StockShell> {
                 ),
               ),
               const SizedBox(width: 22),
-              const Text(
-                'LAST 7 DAYS',
-                style: TextStyle(
+              Text(
+                context.l10n.last7Days,
+                style: const TextStyle(
                   color: Color(0xFFBFB4BC),
                   fontSize: 8,
                   letterSpacing: 1.2,
@@ -943,19 +958,19 @@ class _StockShellState extends State<StockShell> {
       children: [
         stat(
           Icons.inventory_2_outlined,
-          'Stock on hand',
+          context.l10n.stockOnHand,
           '${store.units}',
-          '${store.products.length} unique items',
+          context.l10n.uniqueProducts(store.products.length),
           avocado,
         ),
         const SizedBox(height: 12),
         stat(
           Icons.trending_down_rounded,
-          'Need a little attention',
+          context.l10n.needAttention,
           '${store.low.length}',
           store.low.isEmpty
-              ? 'All stocked up'
-              : 'items running low · Tap to reorder',
+              ? context.l10n.allStockedUp
+              : context.l10n.runningLowReorder,
           maple,
           onTap: () => open(ReorderPage(store: store)),
         ),
@@ -983,16 +998,16 @@ class _StockShellState extends State<StockShell> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Set your store currency',
-                        style: TextStyle(
+                      Text(
+                        context.l10n.setStoreCurrency,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Store currency is currently ${store.currency}. Set your preferred store currency.',
+                        context.l10n.storeCurrencyCurrently(store.currency),
                         style: TextStyle(
                           color: context.stockMuted,
                           fontSize: 12,
@@ -1004,7 +1019,7 @@ class _StockShellState extends State<StockShell> {
                 const SizedBox(width: 8),
                 FilledButton.tonal(
                   onPressed: _showFirstTimeSetup,
-                  child: const Text('Configure'),
+                  child: Text(context.l10n.configure),
                 ),
               ],
             ),
@@ -1026,6 +1041,7 @@ class _StockShellState extends State<StockShell> {
         ],
       ),
       const SizedBox(height: 25),
+      const NativeAdCard(),
       if (wide)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,7 +1058,7 @@ class _StockShellState extends State<StockShell> {
           children: [
             Expanded(
               child: compactStat(
-                'On hand',
+                context.l10n.onHand,
                 '${store.units}',
                 Icons.inventory_2_outlined,
               ),
@@ -1050,7 +1066,7 @@ class _StockShellState extends State<StockShell> {
             const SizedBox(width: 12),
             Expanded(
               child: compactStat(
-                'Low stock',
+                context.l10n.lowStock,
                 '${store.low.length}',
                 Icons.trending_down_rounded,
                 onTap: () => open(ReorderPage(store: store)),
@@ -1059,25 +1075,25 @@ class _StockShellState extends State<StockShell> {
           ],
         ),
       ],
-      section('Quick actions'),
+      section(context.l10n.quickActions),
       Row(
         children: [
           quickAction(
-            'New sale',
+            context.l10n.newSale,
             Icons.add_shopping_cart_outlined,
             avocado,
             () => open(SalePage(store: store)),
           ),
           const SizedBox(width: 12),
           quickAction(
-            'Add item',
+            context.l10n.addItem,
             Icons.add_box_outlined,
             paper,
             () => open(ProductForm(store: store)),
           ),
           const SizedBox(width: 12),
           quickAction(
-            'Share sale',
+            context.l10n.shareSale,
             Icons.qr_code_2_rounded,
             paper,
             _showShareSaleOptions,
@@ -1094,23 +1110,23 @@ class _StockShellState extends State<StockShell> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Stock count in progress (${store.count?['scope'] ?? 'All items'}). Counted items are paused.',
+                  context.l10n.stockCountInProgress(store.count?['scope'] ?? context.l10n.allItems),
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
               TextButton(
                 onPressed: () => open(CountPage(store: store)),
-                child: const Text('Resume'),
+                child: Text(context.l10n.resume),
               ),
             ],
           ),
         ),
       ],
       section(
-        'Needs restocking',
+        context.l10n.needsRestocking,
         action: store.low.isNotEmpty
-            ? 'Shopping list (${store.low.length}) →'
-            : 'View inventory →',
+            ? context.l10n.shoppingListAction(store.low.length)
+            : context.l10n.viewInventoryAction,
         onTap: () => store.low.isNotEmpty
             ? open(ReorderPage(store: store))
             : _selectTab(1),
@@ -1119,13 +1135,12 @@ class _StockShellState extends State<StockShell> {
         Surface(
           child: EmptyState(
             icon: Icons.inventory_2_outlined,
-            title: 'Your stock book starts here.',
-            subtitle:
-                'Add your first item, or import a stock file from another Stockmix user.',
+            title: context.l10n.stockBookStartsHere,
+            subtitle: context.l10n.addFirstItemSubtitle,
             action: FilledButton.icon(
               onPressed: () => open(ProductForm(store: store)),
               icon: const Icon(Icons.add),
-              label: const Text('Add your first item'),
+              label: Text(context.l10n.addFirstItem),
             ),
           ),
         )
@@ -1141,13 +1156,13 @@ class _StockShellState extends State<StockShell> {
           ),
         ),
       section(
-        'The latest in your shop',
-        action: 'View all →',
+        context.l10n.theLatestInShop,
+        action: context.l10n.viewAllAction,
         onTap: () => _selectTab(2),
       ),
       if (store.movements.isEmpty)
         Text(
-          'Your stock changes and sales will appear here.',
+          context.l10n.stockChangesAppearHere,
           style: TextStyle(color: context.stockMuted),
         )
       else
@@ -1159,10 +1174,10 @@ class _StockShellState extends State<StockShell> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.lock_outline, size: 12, color: cement),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
-              'Saved on your device. Ready when you are.',
+              context.l10n.savedOnDeviceReady,
               style: TextStyle(color: context.stockMuted, fontSize: 10),
             ),
           ),
@@ -1350,7 +1365,7 @@ class _StockShellState extends State<StockShell> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${p.category}  ·  ${p.barcode.isEmpty ? 'No barcode' : p.barcode}',
+                  '${p.category}  ·  ${p.barcode.isEmpty ? context.l10n.noBarcode : p.barcode}',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 10, color: context.stockMuted),
                 ),
@@ -1370,7 +1385,7 @@ class _StockShellState extends State<StockShell> {
               ),
               const SizedBox(height: 5),
               Text(
-                '${store.stockLabel(p)} left',
+                context.l10n.unitsLeft(store.stockLabel(p)),
                 style: TextStyle(
                   color: store.stock(p) <= p.threshold
                       ? context.stockRust
@@ -1406,7 +1421,9 @@ class _StockShellState extends State<StockShell> {
         .toList();
     final displayItems =
         (showAllInventory || search.isNotEmpty || filtered.length <= 5)
-        ? filtered
+        ? (filtered.length > inventoryDisplayLimit
+            ? filtered.take(inventoryDisplayLimit).toList()
+            : filtered)
         : filtered.take(5).toList();
     return [
       Row(
@@ -1416,12 +1433,12 @@ class _StockShellState extends State<StockShell> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Your stock,\nat a glance.',
+                  context.l10n.yourStockAtAGlance,
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '${store.products.length} items · ${store.units} units in your shop',
+                  context.l10n.itemsUnitsInShop(store.products.length, store.units),
                   style: TextStyle(fontSize: 12, color: context.stockMuted),
                 ),
               ],
@@ -1429,7 +1446,7 @@ class _StockShellState extends State<StockShell> {
           ),
           IconButton.filled(
             onPressed: () => open(ProductForm(store: store)),
-            tooltip: 'Add item',
+            tooltip: context.l10n.addItem,
             style: IconButton.styleFrom(
               backgroundColor: avocado,
               foregroundColor: plum,
@@ -1443,11 +1460,11 @@ class _StockShellState extends State<StockShell> {
       TextField(
         onChanged: (v) => setState(() => search = v),
         decoration: InputDecoration(
-          hintText: 'Find an item, price or barcode…',
+          hintText: context.l10n.findItemPlaceholder,
           prefixIcon: const Icon(Icons.search),
           suffixIcon: IconButton(
             onPressed: scanToFind,
-            tooltip: 'Scan to find',
+            tooltip: context.l10n.scanToFind,
             icon: const Icon(Icons.qr_code_scanner),
           ),
         ),
@@ -1458,7 +1475,7 @@ class _StockShellState extends State<StockShell> {
         children: [
           ChoiceChip(
             label: Text(
-              'All items',
+              context.l10n.allItems,
               style: TextStyle(
                 color: category == 'All items' ? paper : context.stockMuted,
                 fontSize: 12,
@@ -1471,7 +1488,7 @@ class _StockShellState extends State<StockShell> {
           ActionChip(
             avatar: const Icon(Icons.category_outlined, size: 16),
             label: Text(
-              category == 'All items' ? 'Categories' : category,
+              category == 'All items' ? context.l10n.categories : category,
               style: const TextStyle(fontSize: 12),
             ),
             onPressed: () => _showCategoryPicker(categories),
@@ -1486,7 +1503,7 @@ class _StockShellState extends State<StockShell> {
         runSpacing: 6,
         children: [
           Text(
-            '${filtered.length} ITEMS',
+            context.l10n.itemsCaps(filtered.length),
             style: TextStyle(
               fontSize: 10,
               color: context.stockMuted,
@@ -1505,9 +1522,9 @@ class _StockShellState extends State<StockShell> {
                     Icons.playlist_add_check_outlined,
                     size: 16,
                   ),
-                  label: const Text(
-                    'Low stock',
-                    style: TextStyle(fontSize: 11),
+                  label: Text(
+                    context.l10n.lowStock,
+                    style: const TextStyle(fontSize: 11),
                   ),
                   onPressed: () => open(ReorderPage(store: store)),
                 ),
@@ -1521,15 +1538,15 @@ class _StockShellState extends State<StockShell> {
           child: EmptyState(
             icon: Icons.search_off,
             title: store.products.isEmpty
-                ? 'A fresh start.'
-                : 'No matching items',
+                ? context.l10n.aFreshStart
+                : context.l10n.noMatchingItems,
             subtitle: store.products.isEmpty
-                ? 'Add your first item to start keeping stock.'
-                : 'Try another name or change the filters.',
+                ? context.l10n.addFirstItemToStart
+                : context.l10n.tryAnotherNameOrFilter,
             action: store.products.isEmpty
                 ? FilledButton(
                     onPressed: () => open(ProductForm(store: store)),
-                    child: const Text('Add item'),
+                    child: Text(context.l10n.addItem),
                   )
                 : null,
           ),
@@ -1613,28 +1630,62 @@ class _StockShellState extends State<StockShell> {
               )
               .toList(),
         ),
-        if (filtered.length > 5 && search.isEmpty) ...[
+        if (filtered.length > 5) ...[
           const SizedBox(height: 14),
           Center(
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              onPressed: () =>
-                  setState(() => showAllInventory = !showAllInventory),
-              icon: Icon(
-                showAllInventory
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded,
-              ),
-              label: Text(
-                showAllInventory
-                    ? 'Show less'
-                    : 'See more (${filtered.length - 5} more items)',
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!showAllInventory && search.isEmpty)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    onPressed: () =>
+                        setState(() => showAllInventory = true),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text(
+                      'See more (${filtered.length - 5} more items)',
+                    ),
+                  )
+                else ...[
+                  if (displayItems.length < filtered.length)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => setState(
+                          () => inventoryDisplayLimit += 25),
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: Text(
+                        'See more (${filtered.length - displayItems.length} more items)',
+                      ),
+                    ),
+                  if (showAllInventory) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => setState(() {
+                        showAllInventory = false;
+                        inventoryDisplayLimit = 20;
+                      }),
+                      icon: const Icon(Icons.expand_less_rounded),
+                      label: const Text('Show less'),
+                    ),
+                  ],
+                ],
+              ],
             ),
           ),
         ],
@@ -1650,28 +1701,62 @@ class _StockShellState extends State<StockShell> {
             ],
           ),
         ),
-        if (filtered.length > 5 && search.isEmpty) ...[
+        if (filtered.length > 5) ...[
           const SizedBox(height: 14),
           Center(
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              onPressed: () =>
-                  setState(() => showAllInventory = !showAllInventory),
-              icon: Icon(
-                showAllInventory
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded,
-              ),
-              label: Text(
-                showAllInventory
-                    ? 'Show less'
-                    : 'See more (${filtered.length - 5} more items)',
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!showAllInventory && search.isEmpty)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    onPressed: () =>
+                        setState(() => showAllInventory = true),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text(
+                      'See more (${filtered.length - 5} more items)',
+                    ),
+                  )
+                else ...[
+                  if (displayItems.length < filtered.length)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => setState(
+                          () => inventoryDisplayLimit += 25),
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: Text(
+                        'See more (${filtered.length - displayItems.length} more items)',
+                      ),
+                    ),
+                  if (showAllInventory) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => setState(() {
+                        showAllInventory = false;
+                        inventoryDisplayLimit = 20;
+                      }),
+                      icon: const Icon(Icons.expand_less_rounded),
+                      label: const Text('Show less'),
+                    ),
+                  ],
+                ],
+              ],
             ),
           ),
         ],
@@ -1748,26 +1833,26 @@ class _StockShellState extends State<StockShell> {
 
     return [
       Text(
-        'Every day.\nAll accounted for.',
+        context.l10n.everyDayAccountedFor,
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 10),
       Text(
-        'Your sales and stock changes, in one place.',
+        context.l10n.salesAndChangesInOnePlace,
         style: TextStyle(color: context.stockMuted, fontSize: 12),
       ),
       const SizedBox(height: 20),
       SegmentedButton<int>(
-        segments: const [
+        segments: [
           ButtonSegment(
             value: 0,
-            label: Text('Daily activity'),
-            icon: Icon(Icons.receipt_long_outlined, size: 18),
+            label: Text(context.l10n.dailyActivity),
+            icon: const Icon(Icons.receipt_long_outlined, size: 18),
           ),
           ButtonSegment(
             value: 1,
-            label: Text('Business summary'),
-            icon: Icon(Icons.insights_outlined, size: 18),
+            label: Text(context.l10n.businessSummary),
+            icon: const Icon(Icons.insights_outlined, size: 18),
           ),
         ],
         selected: {recordsMode},
@@ -1781,28 +1866,28 @@ class _StockShellState extends State<StockShell> {
               child: OutlinedButton.icon(
                 onPressed: () => scanReceipt(),
                 icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                label: const Text('Scan receipt QR'),
+                label: Text(context.l10n.scanReceiptQr),
               ),
             ),
             const SizedBox(width: 8),
             IconButton.outlined(
-              tooltip: 'Find receipt by reference',
+              tooltip: context.l10n.findReceiptByReference,
               onPressed: _promptReceiptSearch,
               icon: const Icon(Icons.search_rounded, size: 20),
             ),
             const SizedBox(width: 8),
             PopupMenuButton<int>(
-              tooltip: 'Filter day activity',
+              tooltip: context.l10n.filterDayActivity,
               initialValue: dailyActivityFilter,
               onSelected: (value) => setState(() {
                 dailyActivityFilter = value;
                 showAllRecords = false;
               }),
-              itemBuilder: (context) => [
-                for (final option in const [
-                  (0, 'All activity'),
-                  (1, 'Sales & refunds'),
-                  (2, 'Stock activity'),
+              itemBuilder: (menuCtx) => [
+                for (final option in [
+                  (0, context.l10n.allActivity),
+                  (1, context.l10n.salesAndRefunds),
+                  (2, context.l10n.stockActivity),
                 ])
                   PopupMenuItem(
                     value: option.$1,
@@ -1847,7 +1932,7 @@ class _StockShellState extends State<StockShell> {
           child: Row(
             children: [
               IconButton(
-                tooltip: 'Previous day',
+                tooltip: context.l10n.previousDay,
                 onPressed: () =>
                     setState(() => day = day.subtract(const Duration(days: 1))),
                 icon: const Icon(Icons.chevron_left),
@@ -1871,7 +1956,7 @@ class _StockShellState extends State<StockShell> {
                 ),
               ),
               IconButton(
-                tooltip: 'Next day',
+                tooltip: context.l10n.nextDay,
                 onPressed: dayKey(day) == dayKey(DateTime.now())
                     ? null
                     : () => setState(
@@ -1891,7 +1976,7 @@ class _StockShellState extends State<StockShell> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Eyebrow('Sales recorded', color: plum),
+                    Eyebrow(context.l10n.salesRecordedTitle, color: plum),
                     const SizedBox(height: 10),
                     Text(
                       money(store, store.revenue(day)),
@@ -1912,19 +1997,19 @@ class _StockShellState extends State<StockShell> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const Text('stock movements', style: TextStyle(fontSize: 11)),
+                  Text(context.l10n.stockMovements, style: const TextStyle(fontSize: 11)),
                 ],
               ),
             ],
           ),
         ),
-        section('The day’s activity'),
+        section(context.l10n.theDaysActivity),
         if (activityItems.isEmpty)
-          const Surface(
+          Surface(
             child: EmptyState(
               icon: Icons.receipt_long_outlined,
-              title: 'A quiet page so far.',
-              subtitle: 'No activity matches this filter for the selected day.',
+              title: context.l10n.aQuietPageSoFar,
+              subtitle: context.l10n.noActivityMatchesFilter,
             ),
           )
         else ...[
@@ -1955,8 +2040,8 @@ class _StockShellState extends State<StockShell> {
                 ),
                 label: Text(
                   showAllRecords
-                      ? 'Show less'
-                      : 'See more (${activityItems.length - 5} earlier entries)',
+                      ? context.l10n.showLess
+                      : context.l10n.seeMoreEntries(activityItems.length - 5),
                 ),
               ),
             ),
@@ -1966,23 +2051,23 @@ class _StockShellState extends State<StockShell> {
         FilledButton.icon(
           onPressed: () => open(SharePage(store: store, initialDay: day)),
           icon: const Icon(Icons.ios_share_outlined, size: 19),
-          label: const Text('Share or export this day'),
+          label: Text(context.l10n.shareOrExportThisDay),
         ),
       ] else ...[
         Row(
           children: [
             Expanded(
               child: Text(
-                'Performance overview',
+                context.l10n.performanceOverview,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 7, label: Text('7 days')),
-                ButtonSegment(value: 30, label: Text('30 days')),
+              segments: [
+                ButtonSegment(value: 7, label: Text(context.l10n.daysCount(7))),
+                ButtonSegment(value: 30, label: Text(context.l10n.daysCount(30))),
               ],
               selected: {insightsDays},
               onSelectionChanged: (s) => setState(() => insightsDays = s.first),
@@ -2011,7 +2096,7 @@ class _StockShellState extends State<StockShell> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Eyebrow('Total sales', color: avocado),
+                            Eyebrow(context.l10n.totalSales, color: avocado),
                             const SizedBox(height: 8),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -2026,7 +2111,7 @@ class _StockShellState extends State<StockShell> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${summary['salesCount']} sales in $insightsDays days',
+                              context.l10n.salesInDays(summary['salesCount'] ?? 0, insightsDays),
                               style: const TextStyle(
                                 color: Color(0xFFCCC5CB),
                                 fontSize: 11,
@@ -2044,7 +2129,7 @@ class _StockShellState extends State<StockShell> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Eyebrow('Est. gross profit', color: plum),
+                            Eyebrow(context.l10n.estGrossProfit, color: plum),
                             const SizedBox(height: 8),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -2058,9 +2143,9 @@ class _StockShellState extends State<StockShell> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
-                              'Revenue minus product costs',
-                              style: TextStyle(color: plum, fontSize: 11),
+                            Text(
+                              context.l10n.revenueMinusProductCosts,
+                              style: const TextStyle(color: plum, fontSize: 11),
                             ),
                           ],
                         ),
@@ -2086,7 +2171,7 @@ class _StockShellState extends State<StockShell> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '$missingCost sales lacked a cost price. Estimated profit calculates using known costs.',
+                            context.l10n.salesLackedCost(missingCost),
                             style: TextStyle(
                               fontSize: 11,
                               color: context.stockMuted,
@@ -2098,170 +2183,284 @@ class _StockShellState extends State<StockShell> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                section('Top selling items'),
+                section(context.l10n.topSellingItems),
                 if (topSellers.isEmpty)
-                  const Surface(
+                  Surface(
                     child: EmptyState(
                       icon: Icons.trending_up,
-                      title: 'No sales recorded yet',
-                      subtitle:
-                          'Sales in this period will rank your best-selling items here.',
+                      title: context.l10n.noSalesRecordedYet,
+                      subtitle: context.l10n.salesRankSubtitle,
                     ),
                   )
-                else
-                  Surface(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < topSellers.length; i++) ...[
-                          if (i > 0) const Divider(height: 1),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: i == 0
-                                        ? avocado
-                                        : context.stockLinen,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    '${i + 1}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color: i == 0 ? plum : context.stockMuted,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        topSellers[i]['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${topSellers[i]['quantity']} ${topSellers[i]['unit']} sold',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: context.stockMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  money(store, topSellers[i]['revenue']),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                section('Slow-moving items (14+ days)'),
-                Text(
-                  'Items currently in stock with zero recorded sales in the last 14 days.',
-                  style: TextStyle(color: context.stockMuted, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                if (slowMovers.isEmpty)
-                  const Surface(
-                    child: EmptyState(
-                      icon: Icons.check_circle_outline,
-                      title: 'Healthy movement',
-                      subtitle:
-                          'No stagnant items found. Everything in stock has had sales recently!',
-                    ),
-                  )
-                else
-                  Surface(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < slowMovers.length; i++) ...[
-                          if (i > 0) const Divider(height: 1),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.hourglass_empty_rounded,
-                                  size: 20,
-                                  color: context.stockMuted,
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        slowMovers[i]['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${slowMovers[i]['stock']} ${slowMovers[i]['unit']} in stock',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: context.stockMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                else ...[
+                  Builder(
+                    builder: (context) {
+                      final displayedTopSellers =
+                          topSellers.take(topSellersDisplayLimit).toList();
+                      return Surface(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < displayedTopSellers.length; i++) ...[
+                              if (i > 0) const Divider(height: 1),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
                                   children: [
+                                    Container(
+                                      width: 28,
+                                      height: 28,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: i == 0
+                                            ? avocado
+                                            : context.stockLinen,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '${i + 1}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          color: i == 0 ? plum : context.stockMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayedTopSellers[i]['name'],
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          Text(
+                                            context.l10n.quantitySold(
+                                                displayedTopSellers[i]['quantity'],
+                                                displayedTopSellers[i]['unit']
+                                                    as String),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: context.stockMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                     Text(
-                                      money(store, slowMovers[i]['valuation']),
+                                      money(store,
+                                          displayedTopSellers[i]['revenue']),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),
                                     ),
-                                    Text(
-                                      'tied in stock',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: context.stockMuted,
-                                      ),
-                                    ),
                                   ],
                                 ),
-                              ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  if (topSellers.length > 10) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (topSellersDisplayLimit < topSellers.length)
+                            OutlinedButton.icon(
+                              onPressed: () => setState(
+                                  () => topSellersDisplayLimit += 15),
+                              icon: const Icon(Icons.expand_more_rounded,
+                                  size: 18),
+                              label: Text(
+                                'Show more (${topSellers.length - topSellersDisplayLimit} remaining)',
+                              ),
+                            ),
+                          if (topSellersDisplayLimit > 10) ...[
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: () => setState(
+                                  () => topSellersDisplayLimit = 10),
+                              icon: const Icon(Icons.expand_less_rounded,
+                                  size: 18),
+                              label: const Text('Show less'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 24),
+                section(
+                  context.l10n.slowMovingItems,
+                  action: slowMovers.length > 5
+                      ? 'View all (${slowMovers.length})'
+                      : null,
+                  onTap: slowMovers.length > 5
+                      ? () => open(
+                            SlowMovingItemsPage(
+                              store: store,
+                              slowMovers: slowMovers,
+                            ),
+                          )
+                      : null,
+                ),
+                Text(
+                  context.l10n.slowMovingSubtitle,
+                  style: TextStyle(color: context.stockMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                if (slowMovers.isEmpty)
+                  Surface(
+                    child: EmptyState(
+                      icon: Icons.check_circle_outline,
+                      title: context.l10n.healthyMovement,
+                      subtitle: context.l10n.healthyMovementSubtitle,
+                    ),
+                  )
+                else ...[
+                  Builder(
+                    builder: (context) {
+                      final displayedSlowMovers =
+                          slowMovers.take(slowMoversDisplayLimit).toList();
+                      return Surface(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < displayedSlowMovers.length; i++) ...[
+                              if (i > 0) const Divider(height: 1),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => open(
+                                  ProductPage(
+                                    store: store,
+                                    id: displayedSlowMovers[i]['id'] as String,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.hourglass_empty_rounded,
+                                        size: 20,
+                                        color: context.stockMuted,
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              displayedSlowMovers[i]['name'],
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            Text(
+                                              context.l10n.quantityInStockLabel(
+                                                displayedSlowMovers[i]['stock'],
+                                                displayedSlowMovers[i]['unit']
+                                                    as String,
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: context.stockMuted,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            money(store,
+                                                displayedSlowMovers[i]['valuation']),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          Text(
+                                            context.l10n.tiedInStock,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: context.stockMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  if (slowMovers.length > 15) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (slowMoversDisplayLimit < slowMovers.length)
+                          OutlinedButton.icon(
+                            onPressed: () => setState(
+                                () => slowMoversDisplayLimit += 20),
+                            icon: const Icon(Icons.expand_more_rounded,
+                                size: 18),
+                            label: Text(
+                              'Show more (${slowMovers.length - slowMoversDisplayLimit} remaining)',
                             ),
                           ),
+                        if (slowMoversDisplayLimit > 15) ...[
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: () => setState(
+                                () => slowMoversDisplayLimit = 15),
+                            icon: const Icon(Icons.expand_less_rounded,
+                                size: 18),
+                            label: const Text('Show less'),
+                          ),
                         ],
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          onPressed: () => open(
+                            SlowMovingItemsPage(
+                              store: store,
+                              slowMovers: slowMovers,
+                            ),
+                          ),
+                          icon: const Icon(Icons.list_alt_rounded, size: 18),
+                          label: Text('View all (${slowMovers.length})'),
+                        ),
                       ],
                     ),
-                  ),
+                  ],
+                ],
               ],
             );
           },
@@ -2272,72 +2471,103 @@ class _StockShellState extends State<StockShell> {
 
   List<Widget> more() => [
     Text(
-      'Make it\nyour own.',
+      context.l10n.makeItYourOwn,
       style: Theme.of(context).textTheme.headlineLarge,
     ),
     const SizedBox(height: 12),
     Text(
-      'A few good tools for a well-run shop.',
+      context.l10n.goodToolsWellRunShop,
       style: TextStyle(color: context.stockMuted),
     ),
     const SizedBox(height: 24),
-    Surface(
-      child: Column(
-        children: [
-          menu(
-            Icons.storefront_outlined,
-            'Store settings',
-            '${store.shop} · ${store.currency} · Sounds, theme & display',
-            settings,
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Eyebrow(context.l10n.storeAndPreferences),
+        const SizedBox(height: 10),
+        Surface(
+          child: Column(
+            children: [
+              menu(
+                Icons.storefront_outlined,
+                context.l10n.storeSettings,
+                context.l10n.storeSettingsSub(store.shop, store.currency),
+                settings,
+              ),
+              menu(
+                Icons.auto_stories_outlined,
+                context.l10n.welcomeTour,
+                context.l10n.welcomeTourSubtitle,
+                () => open(OnboardingPage(store: store, isRevisit: true)),
+              ),
+              menu(
+                Icons.privacy_tip_outlined,
+                context.l10n.privacyDataPolicy,
+                context.l10n.privacySub,
+                () => open(const PrivacyPolicyPage()),
+              ),
+            ],
           ),
-          menu(
-            Icons.fact_check_outlined,
-            'Stock count',
-            store.count == null
-                ? 'Count, review differences, and post'
-                : 'Continue your saved count',
-            () => open(CountPage(store: store)),
+        ),
+        const SizedBox(height: 20),
+        Eyebrow(context.l10n.operationsAndTools),
+        const SizedBox(height: 10),
+        Surface(
+          child: Column(
+            children: [
+              menu(
+                Icons.fact_check_outlined,
+                context.l10n.stockCount,
+                store.count == null
+                    ? context.l10n.stockCountSubEmpty
+                    : context.l10n.stockCountSubActive,
+                () => open(CountPage(store: store)),
+              ),
+              menu(
+                Icons.playlist_add_check_outlined,
+                context.l10n.shoppingReorderList,
+                store.low.isEmpty
+                    ? context.l10n.reorderSubEmpty
+                    : context.l10n.reorderSubItems(store.low.length),
+                () => open(ReorderPage(store: store)),
+              ),
+              menu(
+                Icons.qr_code_scanner_rounded,
+                context.l10n.streamScanner,
+                context.l10n.streamScannerSub,
+                () => open(QrStreamReceiverPage(store: store)),
+              ),
+            ],
           ),
-          menu(
-            Icons.playlist_add_check_outlined,
-            'Shopping & reorder list',
-            store.low.isEmpty
-                ? 'All stocked up · No low stock items'
-                : '${store.low.length} items running low · Tap to order',
-            () => open(ReorderPage(store: store)),
+        ),
+        const SizedBox(height: 20),
+        Eyebrow(context.l10n.dataAndSharing),
+        const SizedBox(height: 10),
+        Surface(
+          child: Column(
+            children: [
+              menu(
+                Icons.swap_horiz_rounded,
+                context.l10n.shareAndExport,
+                context.l10n.shareExportSub,
+                () => open(SharePage(store: store)),
+              ),
+              menu(
+                Icons.folder_open_outlined,
+                context.l10n.receivedSavedRecords,
+                context.l10n.receivedRecordsSub(store.received.length),
+                () => open(ReceivedPage(store: store)),
+              ),
+              menu(
+                Icons.settings_backup_restore_outlined,
+                context.l10n.fullBackupRestore,
+                context.l10n.backupRestoreSub,
+                () => open(BackupRestorePage(store: store)),
+              ),
+            ],
           ),
-          menu(
-            Icons.swap_horiz_rounded,
-            'Share & export',
-            'Send stock, import files, or export day records',
-            () => open(SharePage(store: store)),
-          ),
-          menu(
-            Icons.qr_code_scanner_rounded,
-            'Stream scanner',
-            'Receive entries offline via animated QR stream',
-            () => open(QrStreamReceiverPage(store: store)),
-          ),
-          menu(
-            Icons.folder_open_outlined,
-            'Received & saved records',
-            '${store.received.length} imported files and completed counts',
-            () => open(ReceivedPage(store: store)),
-          ),
-          menu(
-            Icons.settings_backup_restore_outlined,
-            'Full backup & restore',
-            'Save everything or restore a previous backup file',
-            () => open(BackupRestorePage(store: store)),
-          ),
-          menu(
-            Icons.privacy_tip_outlined,
-            'Privacy & data policy',
-            '100% offline · No tracking · All data stays on this device',
-            () => open(const PrivacyPolicyPage()),
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
     const SizedBox(height: 20),
     Surface(
@@ -2345,10 +2575,10 @@ class _StockShellState extends State<StockShell> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Eyebrow('A stock book that goes with you', color: avocado),
+          Eyebrow(context.l10n.stockBookGoesWithYou, color: avocado),
           const SizedBox(height: 15),
           Text(
-            'No signal?\nNo interruption.',
+            context.l10n.noSignalNoInterruption,
             style: TextStyle(
               color: paper,
               fontSize: 25,
@@ -2357,9 +2587,9 @@ class _StockShellState extends State<StockShell> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Items, photos, sales, and counts are saved on this device. Export regularly to keep a copy somewhere safe.',
-            style: TextStyle(
+          Text(
+            context.l10n.offlineDeviceStorageDescription,
+            style: const TextStyle(
               color: Color(0xFFD1C6CD),
               fontSize: 12,
               height: 1.6,
@@ -2374,9 +2604,9 @@ class _StockShellState extends State<StockShell> {
         onPressed: () async {
           if (await confirm(
             context,
-            'Explore with sample items?',
-            'This adds six clearly marked sample products and a sample sale. Use a separate empty store for real records.',
-            action: 'Add sample data',
+            context.l10n.exploreSampleTitle,
+            context.l10n.exploreSampleMessage,
+            action: context.l10n.addSampleData,
           )) {
             try {
               await store.loadDemo();
@@ -2385,11 +2615,11 @@ class _StockShellState extends State<StockShell> {
             }
           }
         },
-        child: const Text('Explore with sample items'),
+        child: Text(context.l10n.exploreWithSampleItems),
       ),
     ],
     const SizedBox(height: 30),
-    const Center(child: Eyebrow('Stockmix · Made for the everyday')),
+    Center(child: Eyebrow(context.l10n.stockmixTagline)),
   ];
   Widget menu(
     IconData icon,
@@ -3407,8 +3637,8 @@ class ProductPage extends StatelessWidget {
       final p = store.products.where((item) => item.id == id).firstOrNull;
       if (p == null) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Item details')),
-          body: const Center(child: Text('This item has been removed.')),
+          appBar: AppBar(title: Text(context.l10n.itemDetails)),
+          body: Center(child: Text(context.l10n.itemRemoved)),
         );
       }
       final qty = store.stock(p);
@@ -3419,29 +3649,29 @@ class ProductPage extends StatelessWidget {
         if (store.count != null) {
           showMessage(
             context,
-            'Finish or cancel the active stock count first.',
+            context.l10n.finishCancelCountFirst,
           );
           return;
         }
         if (qty > 0) {
           showMessage(
             context,
-            'Cannot delete: You still have ${store.stockLabel(p)} in stock. Please adjust or sell stock to 0 first.',
+            context.l10n.cannotDeleteStockRemaining(store.stockLabel(p)),
           );
           return;
         }
         final confirmed = await confirm(
           context,
-          'Delete "${p.name}"?',
-          'This will permanently remove this item and its records from your store.',
-          action: 'Delete item',
+          context.l10n.deleteItemConfirmTitle(p.name),
+          context.l10n.deleteItemConfirmMessage,
+          action: context.l10n.deleteItemAction,
         );
         if (!confirmed) return;
         try {
           await store.deleteProduct(p.id);
           if (context.mounted) {
             Navigator.pop(context);
-            showMessage(context, '"${p.name}" deleted from your inventory.');
+            showMessage(context, context.l10n.itemDeletedFromInventory(p.name));
           }
         } catch (e) {
           if (context.mounted) showMessage(context, friendlyError(e));
@@ -3510,7 +3740,7 @@ class ProductPage extends StatelessWidget {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Close',
+                              tooltip: context.l10n.close,
                               onPressed: () => Navigator.pop(dialogCtx),
                               icon: const Icon(Icons.close_rounded),
                             ),
@@ -3560,7 +3790,7 @@ class ProductPage extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Pinch or scroll to zoom · ${(p.photo!.length * .75 / 1024).round()} KB',
+                                context.l10n.pinchToZoom((p.photo!.length * .75 / 1024).round()),
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: dialogCtx.stockMuted,
@@ -3583,15 +3813,15 @@ class ProductPage extends StatelessWidget {
 
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Item details'),
+          title: Text(context.l10n.itemDetails),
           actions: [
             IconButton(
-              tooltip: 'Edit item',
+              tooltip: context.l10n.editItem,
               onPressed: () => open(ProductForm(store: store, product: p)),
               icon: const Icon(Icons.edit_outlined),
             ),
             IconButton(
-              tooltip: 'Delete item',
+              tooltip: context.l10n.deleteItem,
               onPressed: handleDelete,
               icon: Icon(Icons.delete_outline, color: context.stockRust),
             ),
@@ -3611,7 +3841,7 @@ class ProductPage extends StatelessWidget {
                       Row(
                         children: [
                           Tooltip(
-                            message: 'Tap to view full image',
+                            message: context.l10n.tapToViewFullImage,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(16),
                               onTap: showImagePopup,
@@ -3643,10 +3873,10 @@ class ProductPage extends StatelessWidget {
                           const Spacer(),
                           Tag(
                             qty == 0
-                                ? 'Out of stock'
+                                ? context.l10n.outOfStock
                                 : qty <= p.threshold
-                                ? 'Running low'
-                                : 'In stock',
+                                ? context.l10n.runningLow
+                                : context.l10n.inStock,
                             color: qty <= p.threshold
                                 ? context.stockRust
                                 : context.stockPositive,
@@ -3667,7 +3897,7 @@ class ProductPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Eyebrow('${p.unit} price'),
+                                Eyebrow(context.l10n.unitPriceLabel(p.unit)),
                                 const SizedBox(height: 8),
                                 Text(
                                   money(store, p.price),
@@ -3682,7 +3912,7 @@ class ProductPage extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Eyebrow('Available'),
+                              Eyebrow(context.l10n.available),
                               const SizedBox(height: 8),
                               Text(
                                 store.stockLabel(p),
@@ -3699,7 +3929,7 @@ class ProductPage extends StatelessWidget {
                       const Divider(),
                       const SizedBox(height: 18),
                       Text(
-                        'Cost: ${money(store, p.cost)}  ·  Low-stock alert: ${p.threshold}',
+                        context.l10n.costAndAlert(money(store, p.cost), p.threshold),
                         style: TextStyle(
                           fontSize: 12,
                           color: context.stockMuted,
@@ -3708,7 +3938,7 @@ class ProductPage extends StatelessWidget {
                       const SizedBox(height: 12),
                       if (p.sellsByPack) ...[
                         Text(
-                          'Pack: ${p.packSize} ${p.unit} · ${money(store, p.packPrice!)} · defaults to ${p.defaultUnit.name}',
+                          context.l10n.packInfo(p.packSize, p.unit, money(store, p.packPrice!), p.defaultUnit.name),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.stockMuted,
@@ -3727,7 +3957,7 @@ class ProductPage extends StatelessWidget {
                           Expanded(
                             child: SelectableText(
                               p.barcode.isEmpty
-                                  ? 'No barcode assigned'
+                                  ? context.l10n.noBarcodeAssigned
                                   : p.barcode,
                               style: TextStyle(
                                 color: context.stockMuted,
@@ -3746,7 +3976,7 @@ class ProductPage extends StatelessWidget {
                       ? null
                       : () => open(SalePage(store: store, initialProduct: p)),
                   icon: const Icon(Icons.add_shopping_cart),
-                  label: const Text('Record a sale'),
+                  label: Text(context.l10n.recordASale),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -3761,7 +3991,7 @@ class ProductPage extends StatelessWidget {
                           ),
                         ),
                         icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Receive'),
+                        label: Text(context.l10n.receive),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3770,14 +4000,14 @@ class ProductPage extends StatelessWidget {
                         onPressed: () =>
                             open(AdjustmentPage(store: store, product: p)),
                         icon: const Icon(Icons.tune, size: 18),
-                        label: const Text('Adjust'),
+                        label: Text(context.l10n.adjust),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Item history',
+                  context.l10n.movementHistory,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -3791,7 +4021,7 @@ class ProductPage extends StatelessWidget {
                   onPressed: handleDelete,
                   icon: Icon(Icons.delete_outline, color: context.stockRust),
                   label: Text(
-                    'Delete this item',
+                    context.l10n.deleteItem,
                     style: TextStyle(color: context.stockRust),
                   ),
                 ),

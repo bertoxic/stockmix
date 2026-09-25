@@ -7,6 +7,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   mobile_scanner: ^7.4.0
   image_picker: ^1.2.3
   image: ^4.5.4
@@ -19,8 +21,11 @@ dependencies:
   uuid: ^4.5.3
   google_mlkit_text_recognition: ^0.17.1
   qr_flutter: ^4.1.0
+  qr: ^3.0.2
   crypto: ^3.0.7
   archive: ^4.2.0
+  nearby_connections: ^4.3.0
+  google_mobile_ads: ^9.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

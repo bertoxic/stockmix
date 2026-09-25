@@ -6,6 +6,7 @@ import 'package:stockmix/features/app/pages.dart';
 import 'package:stockmix/features/sales/invoice_page.dart';
 import 'package:stockmix/features/scanner/scanner_page.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 class SalePage extends StatefulWidget {
   final StockStore store;
@@ -29,15 +30,22 @@ class _SalePageState extends State<SalePage> {
   int discount = 0;
   StockStore get store => widget.store;
 
-  List<Product> get _filteredProducts {
+  int _catalogDisplayLimit = 20;
+
+  List<Product> get _allMatchingProducts {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) {
-      return store.products.reversed.take(4).toList();
+      return store.products.reversed.toList();
     }
     return store.products
         .where((p) => '${p.name} ${p.barcode}'.toLowerCase().contains(q))
-        .take(12)
         .toList();
+  }
+
+  List<Product> get _filteredProducts {
+    final all = _allMatchingProducts;
+    final limit = query.trim().isEmpty ? 4 : _catalogDisplayLimit;
+    return all.take(limit).toList();
   }
 
   @override
@@ -60,7 +68,7 @@ class _SalePageState extends State<SalePage> {
         (store.count!['baseline'] as Map).containsKey(p.id)) {
       showMessage(
         context,
-        '${p.name} is currently in an active stock count and cannot be sold until the count is completed.',
+        context.l10n.itemInActiveCountCannotSell(p.name),
       );
       return;
     }
@@ -68,7 +76,7 @@ class _SalePageState extends State<SalePage> {
         store.stock(p)) {
       showMessage(
         context,
-        'All available units of this item are already in the sale.',
+        context.l10n.allUnitsInSale,
       );
       return;
     }
@@ -110,26 +118,26 @@ class _SalePageState extends State<SalePage> {
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add discount'),
+        title: Text(context.l10n.addDiscount),
         content: TextField(
           controller: amount,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Discount amount',
+          decoration: InputDecoration(
+            labelText: context.l10n.discountAmount,
             hintText: '0.00',
-            helperText: 'Enter the cash amount to subtract, not a percentage.',
+            helperText: context.l10n.helperDiscountCash,
           ),
         ),
         actions: [
           if (discount > 0)
             TextButton(
               onPressed: () => Navigator.pop(ctx, 0),
-              child: const Text('Remove discount'),
+              child: Text(context.l10n.removeDiscount),
             ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -137,13 +145,13 @@ class _SalePageState extends State<SalePage> {
               if (parsed == null || parsed < 0 || parsed * 100 > subtotal) {
                 showMessage(
                   ctx,
-                  'Enter an amount from 0 to ${money(store, subtotal)}.',
+                  context.l10n.enterAmountFromZeroTo(money(store, subtotal)),
                 );
                 return;
               }
               Navigator.pop(ctx, (parsed * 100).round());
             },
-            child: const Text('Apply discount'),
+            child: Text(context.l10n.applyDiscount),
           ),
         ],
       ),
@@ -158,18 +166,21 @@ class _SalePageState extends State<SalePage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, update) => AlertDialog(
-          title: const Text('Record cash received?'),
+          title: Text(context.l10n.recordCashReceivedTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Confirm you received ${money(store, subtotal - pendingDiscount)}. This will save the sale and deduct ${cart.totalBaseUnits} base units from stock.',
+                context.l10n.recordCashReceivedMessage(
+                  money(store, subtotal - pendingDiscount),
+                  cart.totalBaseUnits,
+                ),
               ),
               if (pendingDiscount > 0) ...[
                 const SizedBox(height: 12),
                 Text(
-                  'Discount: −${money(store, pendingDiscount)}',
+                  context.l10n.discountDeduction(money(store, pendingDiscount)),
                   style: TextStyle(color: context.stockMuted),
                 ),
               ],
@@ -183,16 +194,18 @@ class _SalePageState extends State<SalePage> {
               },
               icon: const Icon(Icons.sell_outlined, size: 18),
               label: Text(
-                pendingDiscount == 0 ? 'Add discount' : 'Edit discount',
+                pendingDiscount == 0
+                    ? context.l10n.addDiscount
+                    : context.l10n.editDiscount,
               ),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Cash received'),
+              child: Text(context.l10n.cashReceived),
             ),
           ],
         ),
@@ -206,9 +219,9 @@ class _SalePageState extends State<SalePage> {
     final scope = store.count?['scope'] ?? 'All items';
     final shouldCancel = await confirm(
       context,
-      'Cancel active stock count?',
-      'This will discard the saved count entries for $scope. Your inventory will stay unchanged, and all items can be sold again.',
-      action: 'Cancel count',
+      context.l10n.cancelActiveStockCountTitle,
+      context.l10n.cancelActiveStockCountMessage(scope),
+      action: context.l10n.cancelCountAction,
     );
     if (!shouldCancel) return;
     try {
@@ -216,7 +229,7 @@ class _SalePageState extends State<SalePage> {
       if (mounted) {
         showMessage(
           context,
-          'Stock count cancelled. All items are available to sell.',
+          context.l10n.stockCountCancelledSellMsg,
         );
       }
     } catch (e) {
@@ -255,9 +268,9 @@ class _SalePageState extends State<SalePage> {
             size: 48,
             color: Color(0xFF737638),
           ),
-          title: const Text('Sale recorded.'),
+          title: Text(context.l10n.saleRecorded),
           content: Text(
-            '${money(store, recordedTotal)} saved on this device. Your stock is up to date.',
+            context.l10n.saleSavedOnDevice(money(store, recordedTotal)),
           ),
           actions: [
             OutlinedButton.icon(
@@ -279,11 +292,11 @@ class _SalePageState extends State<SalePage> {
                 );
               },
               icon: const Icon(Icons.receipt_long_outlined, size: 18),
-              label: const Text('Share receipt'),
+              label: Text(context.l10n.shareReceipt),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Next sale'),
+              child: Text(context.l10n.nextSale),
             ),
           ],
         ),
@@ -302,7 +315,7 @@ class _SalePageState extends State<SalePage> {
       if (mounted) {
         showMessage(
           context,
-          'Sale held. You can resume it anytime from Home or Sales.',
+          context.l10n.saleHeldMessage,
         );
         Navigator.pop(context);
       }
@@ -316,7 +329,7 @@ class _SalePageState extends State<SalePage> {
       await store.deleteHeldSale(id);
       if (mounted) {
         setState(() {});
-        showMessage(context, 'Held sale discarded.');
+        showMessage(context, context.l10n.heldSaleDiscarded);
       }
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
@@ -333,25 +346,25 @@ class _SalePageState extends State<SalePage> {
         final choice = await showDialog<String>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Leave unfinished sale?'),
-            content: const Text(
-              'You have items in this sale. Would you like to hold this sale so you can resume it later, or discard it?',
+            title: Text(context.l10n.leaveUnfinishedSaleTitle),
+            content: Text(
+              context.l10n.leaveUnfinishedSaleMessage,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, 'cancel'),
-                child: const Text('Stay'),
+                child: Text(context.l10n.stay),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, 'discard'),
                 child: Text(
-                  'Discard',
+                  context.l10n.discard,
                   style: TextStyle(color: context.stockRust),
                 ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, 'hold'),
-                child: const Text('Hold sale'),
+                child: Text(context.l10n.holdSale),
               ),
             ],
           ),
@@ -367,22 +380,22 @@ class _SalePageState extends State<SalePage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('New sale'),
+          title: Text(context.l10n.newSale),
           actions: [
             IconButton(
               onPressed: () => showCalculator(context),
-              tooltip: 'Calculator',
+              tooltip: context.l10n.calculator,
               icon: const Icon(Icons.calculate_outlined),
             ),
             if (cart.isNotEmpty)
               TextButton.icon(
                 onPressed: _holdCurrentSale,
                 icon: const Icon(Icons.pause_circle_outline, size: 18),
-                label: const Text('Hold'),
+                label: Text(context.l10n.hold),
               ),
             IconButton(
               onPressed: scan,
-              tooltip: 'Scan item into sale',
+              tooltip: context.l10n.scanItemIntoSale,
               icon: const Icon(Icons.qr_code_scanner),
             ),
             const SizedBox(width: 8),
@@ -394,10 +407,10 @@ class _SalePageState extends State<SalePage> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                const Eyebrow('The everyday checkout'),
+                Eyebrow(context.l10n.theEverydayCheckout),
                 const SizedBox(height: 10),
                 Text(
-                  'A good find.\nA simple sale.',
+                  context.l10n.goodFindSimpleSale,
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 if (store.count != null) ...[
@@ -414,17 +427,17 @@ class _SalePageState extends State<SalePage> {
                               color: context.stockRust,
                             ),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Some sales are paused',
-                                style: TextStyle(fontWeight: FontWeight.w800),
+                                context.l10n.someSalesPaused,
+                                style: const TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'A stock count is active for ${store.count?['scope'] ?? 'All items'}. Items in that count cannot be sold until it is finished. To finish it, go to More → Stock count, count the remaining items (use 0 where needed), then review and post it.',
+                          context.l10n.stockCountActiveSaleNotice(store.count?['scope'] ?? 'All items'),
                           style: TextStyle(
                             fontSize: 12,
                             color: context.stockMuted,
@@ -435,7 +448,7 @@ class _SalePageState extends State<SalePage> {
                         OutlinedButton.icon(
                           onPressed: _cancelActiveCount,
                           icon: const Icon(Icons.cancel_outlined, size: 18),
-                          label: const Text('Cancel active count'),
+                          label: Text(context.l10n.cancelActiveCount),
                         ),
                       ],
                     ),
@@ -461,7 +474,9 @@ class _SalePageState extends State<SalePage> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '${store.heldSales.length} held ${store.heldSales.length == 1 ? 'sale' : 'sales'} waiting',
+                              store.heldSales.length == 1
+                                  ? context.l10n.heldSaleWaitingOne
+                                  : context.l10n.heldSalesWaiting(store.heldSales.length),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
@@ -495,7 +510,7 @@ class _SalePageState extends State<SalePage> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        '$itemCount items · ${money(store, hTotal)} ($timeStr)',
+                                        '$itemCount ${context.l10n.units} · ${money(store, hTotal)} ($timeStr)',
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -511,10 +526,10 @@ class _SalePageState extends State<SalePage> {
                                           });
                                         }
                                       },
-                                      child: const Text('Resume'),
+                                      child: Text(context.l10n.resume),
                                     ),
                                     IconButton(
-                                      tooltip: 'Discard held sale',
+                                      tooltip: context.l10n.discard,
                                       icon: Icon(
                                         Icons.close,
                                         size: 16,
@@ -539,21 +554,21 @@ class _SalePageState extends State<SalePage> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Your sale',
+                        context.l10n.yourSale,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
                     Tag(
                       cart.isEmpty
-                          ? '0 items'
-                          : '${cart.totalBaseUnits} units · ${money(store, total)}',
+                          ? '0 ${context.l10n.items}'
+                          : '${cart.totalBaseUnits} ${cart.totalBaseUnits == 1 ? context.l10n.unit : context.l10n.units} · ${money(store, total)}',
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 if (cart.isEmpty)
                   Text(
-                    'Tap an item below or scan a barcode to add to this sale.',
+                    context.l10n.tapItemOrScanToAdd,
                     style: TextStyle(color: context.stockMuted, fontSize: 12),
                   )
                 else
@@ -591,7 +606,7 @@ class _SalePageState extends State<SalePage> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Remove one ${p.name}',
+                              tooltip: '${context.l10n.delete} ${p.name}',
                               onPressed: () => setState(() {
                                 cart.removeOne(line);
                               }),
@@ -608,7 +623,7 @@ class _SalePageState extends State<SalePage> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Add one ${p.name}',
+                              tooltip: '${context.l10n.addItem} ${p.name}',
                               onPressed:
                                   cart.baseQuantityFor(p.id) +
                                           line.unitMultiplier >
@@ -636,32 +651,34 @@ class _SalePageState extends State<SalePage> {
                   }),
                 const SizedBox(height: 24),
                 TextField(
-                  onChanged: (v) => setState(() => query = v),
+                  onChanged: (v) => setState(() {
+                    query = v;
+                    _catalogDisplayLimit = 20;
+                  }),
                   decoration: InputDecoration(
-                    hintText: 'Search items to add…',
+                    hintText: context.l10n.searchItemsToAdd,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: IconButton(
                       onPressed: scan,
-                      tooltip: 'Scan item',
+                      tooltip: context.l10n.scanItem,
                       icon: const Icon(Icons.qr_code_scanner),
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
                 if (store.products.isEmpty)
-                  const EmptyState(
+                  EmptyState(
                     icon: Icons.shopping_bag_outlined,
-                    title: 'Add products first',
-                    subtitle:
-                        'Your inventory items will appear here, ready to sell.',
+                    title: context.l10n.addProductsFirst,
+                    subtitle: context.l10n.inventoryItemsAppearHere,
                   )
                 else ...[
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
                       query.trim().isEmpty
-                          ? 'Recent items'
-                          : 'Matching items (${_filteredProducts.length})',
+                          ? context.l10n.recentItems
+                          : context.l10n.matchingItems(_allMatchingProducts.length),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -674,7 +691,7 @@ class _SalePageState extends State<SalePage> {
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: Text(
-                          'No items match "$query"',
+                          context.l10n.noItemsMatch(query),
                           style: TextStyle(
                             color: context.stockMuted,
                             fontSize: 13,
@@ -682,7 +699,7 @@ class _SalePageState extends State<SalePage> {
                         ),
                       ),
                     )
-                  else
+                  else ...[
                     Surface(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 13,
@@ -714,13 +731,13 @@ class _SalePageState extends State<SalePage> {
                                         ),
                                       ),
                                       if (isCountLocked)
-                                        const Tag('Counting', color: avocado),
+                                        Tag(context.l10n.countingTag, color: avocado),
                                     ],
                                   ),
                                   subtitle: Text(
                                     isCountLocked
-                                        ? 'Locked in active count'
-                                        : '${money(store, p.price)}  ·  ${store.stock(p)} available',
+                                        ? context.l10n.lockedInActiveCount
+                                        : '${money(store, p.price)}  ·  ${context.l10n.availableCount(store.stock(p))}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isCountLocked
@@ -730,8 +747,8 @@ class _SalePageState extends State<SalePage> {
                                   ),
                                   trailing: IconButton.filledTonal(
                                     tooltip: isCountLocked
-                                        ? 'Locked in active count'
-                                        : 'Add ${p.name}',
+                                        ? context.l10n.lockedInActiveCount
+                                        : '${context.l10n.addItem} ${p.name}',
                                     style: IconButton.styleFrom(
                                       backgroundColor: context.stockLinen,
                                     ),
@@ -750,14 +767,47 @@ class _SalePageState extends State<SalePage> {
                         ],
                       ),
                     ),
+                    if (query.trim().isNotEmpty &&
+                        _allMatchingProducts.length > _filteredProducts.length)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _catalogDisplayLimit += 20;
+                              });
+                            },
+                            icon: const Icon(Icons.expand_more, size: 16),
+                            label: Text(
+                              'Load more products (${_allMatchingProducts.length - _filteredProducts.length} more)',
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_catalogDisplayLimit > 20 && query.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Center(
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _catalogDisplayLimit = 20;
+                              });
+                            },
+                            child: const Text('Show less'),
+                          ),
+                        ),
+                      ),
+                  ],
                 ],
                 const SizedBox(height: 24),
                 TextField(
                   controller: note,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Sale note (optional)',
-                    hintText: 'Customer name, receipt reference…',
+                  decoration: InputDecoration(
+                    labelText: context.l10n.saleNoteOptional,
+                    hintText: context.l10n.saleNoteHint,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -767,10 +817,10 @@ class _SalePageState extends State<SalePage> {
                     children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Total',
-                              style: TextStyle(
+                              context.l10n.total,
+                              style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -791,7 +841,7 @@ class _SalePageState extends State<SalePage> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Discount −${money(store, discount)}',
+                                context.l10n.discountDeduction(money(store, discount)),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -799,7 +849,7 @@ class _SalePageState extends State<SalePage> {
                               ),
                             ),
                             Text(
-                              'Before ${money(store, subtotal)}',
+                              context.l10n.beforeDiscount(money(store, subtotal)),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: context.stockMuted,
@@ -813,7 +863,7 @@ class _SalePageState extends State<SalePage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Cash recording only. Add a fixed discount when confirming cash received.',
+                  context.l10n.cashRecordingOnlyNote,
                   style: TextStyle(
                     fontSize: 11,
                     color: context.stockMuted,
@@ -824,7 +874,7 @@ class _SalePageState extends State<SalePage> {
                 FilledButton.icon(
                   onPressed: saving || cart.isEmpty ? null : checkout,
                   icon: const Icon(Icons.check),
-                  label: Text(saving ? 'Saving…' : 'Record cash sale'),
+                  label: Text(saving ? context.l10n.savingEllipsis : context.l10n.recordCashSale),
                 ),
                 const SizedBox(height: 15),
               ],
@@ -847,6 +897,7 @@ class _CountPageState extends State<CountPage> {
   StockStore get store => widget.store;
   bool review = false;
   String selectedScope = 'All items';
+  int _countDisplayLimit = 30;
 
   List<Product> get _scopedProducts {
     if (selectedScope == 'All items') return store.products;
@@ -874,19 +925,19 @@ class _CountPageState extends State<CountPage> {
           controller: c,
           autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Actual quantity on the shelf',
+          decoration: InputDecoration(
+            labelText: context.l10n.actualQtyShelf,
           ),
           onSubmitted: (value) => Navigator.pop(ctx, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, c.text),
-            child: const Text('Save count'),
+            child: Text(context.l10n.saveCount),
           ),
         ],
       ),
@@ -895,7 +946,7 @@ class _CountPageState extends State<CountPage> {
       final qty = int.tryParse(result);
       if (qty == null || qty < 0 || qty > 100000000) {
         if (mounted) {
-          showMessage(context, 'Enter a whole quantity, zero or more.');
+          showMessage(context, context.l10n.enterWholeQuantity);
         }
       } else {
         await run(() => store.setCount(p.id, qty));
@@ -913,7 +964,7 @@ class _CountPageState extends State<CountPage> {
     if (code == null || !mounted) return;
     final p = store.lookup(code);
     if (p == null || !(store.count!['baseline'] as Map).containsKey(p.id)) {
-      showMessage(context, 'This item is not in the current count.');
+      showMessage(context, context.l10n.itemNotInCurrentCount);
       return;
     }
     await enter(p);
@@ -929,7 +980,7 @@ class _CountPageState extends State<CountPage> {
       final scope = (count?['scope'] as String?) ?? 'All items';
       return Scaffold(
         appBar: AppBar(
-          title: Text(review ? 'Review stock count' : 'Count your stock'),
+          title: Text(review ? context.l10n.reviewStockCount : context.l10n.countYourStock),
         ),
         body: Center(
           child: ConstrainedBox(
@@ -937,14 +988,14 @@ class _CountPageState extends State<CountPage> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                const Eyebrow('A place for every piece'),
+                Eyebrow(context.l10n.placeForEveryPiece),
                 const SizedBox(height: 12),
                 Text(
                   count == null
-                      ? 'A fresh look\nat what’s on hand.'
+                      ? context.l10n.freshLookOnHand
                       : review
-                      ? 'A moment to\ncheck the difference.'
-                      : 'One shelf\nat a time.',
+                      ? context.l10n.momentCheckDifference
+                      : context.l10n.oneShelfAtATime,
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 18),
@@ -960,21 +1011,21 @@ class _CountPageState extends State<CountPage> {
                           color: context.stockInk,
                           size: 22,
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Counting during business hours',
-                                style: TextStyle(
+                                context.l10n.countingDuringHours,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
-                                'Only the items included in this count will have their sales and stock adjustments locked. Uncounted items remain fully available to sell at the checkout.',
+                                context.l10n.countingDuringHoursNote,
                                 style: TextStyle(
                                   color: context.stockMuted,
                                   fontSize: 12,
@@ -991,14 +1042,14 @@ class _CountPageState extends State<CountPage> {
                   if (store.categories.isNotEmpty) ...[
                     DropdownButtonFormField<String>(
                       initialValue: selectedScope,
-                      decoration: const InputDecoration(
-                        labelText: 'Count scope',
-                        prefixIcon: Icon(Icons.category_outlined),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.countScope,
+                        prefixIcon: const Icon(Icons.category_outlined),
                       ),
                       items: [
                         DropdownMenuItem(
                           value: 'All items',
-                          child: Text('All items (${store.products.length})'),
+                          child: Text('${context.l10n.allItems} (${store.products.length})'),
                         ),
                         for (final cat in store.categories)
                           DropdownMenuItem(
@@ -1009,7 +1060,12 @@ class _CountPageState extends State<CountPage> {
                           ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setState(() => selectedScope = val);
+                        if (val != null) {
+                          setState(() {
+                            selectedScope = val;
+                            _countDisplayLimit = 30;
+                          });
+                        }
                       },
                     ),
                     const SizedBox(height: 18),
@@ -1024,14 +1080,14 @@ class _CountPageState extends State<CountPage> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          '${_scopedProducts.length} items to count',
+                          context.l10n.itemsToCount(_scopedProducts.length),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           selectedScope == 'All items'
-                              ? 'Full store inventory count. Progress saves automatically.'
-                              : 'Category count: $selectedScope. Progress saves automatically.',
+                              ? context.l10n.fullStoreCountNotice
+                              : context.l10n.categoryCountNotice(selectedScope),
                           style: TextStyle(
                             color: context.stockMuted,
                             fontSize: 12,
@@ -1056,8 +1112,8 @@ class _CountPageState extends State<CountPage> {
                           },
                     child: Text(
                       selectedScope == 'All items'
-                          ? 'Start full stock count'
-                          : 'Start count for $selectedScope',
+                          ? context.l10n.startFullStockCount
+                          : context.l10n.startCountFor(selectedScope),
                     ),
                   ),
                 ] else ...[
@@ -1070,7 +1126,7 @@ class _CountPageState extends State<CountPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${values.length} of ${baseline.length} counted',
+                              context.l10n.countedOfTotal(values.length, baseline.length),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 19,
@@ -1092,8 +1148,8 @@ class _CountPageState extends State<CountPage> {
                         const SizedBox(height: 12),
                         Text(
                           scope == 'All items'
-                              ? 'Saved on this device · All stock changes paused'
-                              : 'Saved on this device · Counted items locked · Other items sellable',
+                              ? context.l10n.allChangesPaused
+                              : context.l10n.categoryChangesPaused,
                           style: const TextStyle(fontSize: 11),
                         ),
                       ],
@@ -1104,72 +1160,141 @@ class _CountPageState extends State<CountPage> {
                     OutlinedButton.icon(
                       onPressed: scan,
                       icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Scan an item to count'),
+                      label: Text(context.l10n.scanItemToCount),
                     ),
                     const SizedBox(height: 18),
                   ],
-                  for (final id in baseline.keys)
-                    Builder(
-                      builder: (context) {
-                        final p = store.product(id);
-                        final value = values[id] as int?;
-                        final variance = value == null
-                            ? null
-                            : value - (baseline[id] as int);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Material(
-                            color: context.stockPaper,
-                            borderRadius: BorderRadius.circular(18),
-                            child: ListTile(
-                              onTap: () => enter(p),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              leading: ProductImage(p, size: 45),
-                              title: Text(
-                                p.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              subtitle: Text(
-                                review
-                                    ? 'Expected ${baseline[id]} · Counted ${value ?? '—'}'
-                                    : 'Expected ${baseline[id]} ${p.unit}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.stockMuted,
-                                ),
-                              ),
-                              trailing: review
-                                  ? Tag(
-                                      variance == null
-                                          ? 'Not counted'
-                                          : variance == 0
-                                          ? 'Matches'
-                                          : '${variance > 0 ? '+' : ''}$variance',
-                                      color: variance == 0
-                                          ? context.stockPositive
-                                          : context.stockRust,
-                                    )
-                                  : Text(
-                                      value?.toString() ?? 'Count',
-                                      style: TextStyle(
-                                        color: value == null
-                                            ? context.stockMuted
-                                            : context.stockInk,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: value == null ? 12 : 22,
+                  Builder(
+                    builder: (context) {
+                      final baselineKeys = baseline.keys.toList();
+                      final visibleKeys =
+                          baselineKeys.take(_countDisplayLimit).toList();
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final id in visibleKeys)
+                            Builder(
+                              builder: (context) {
+                                final p = store.product(id);
+                                final value = values[id] as int?;
+                                final variance = value == null
+                                    ? null
+                                    : value - (baseline[id] as int);
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Material(
+                                    color: context.stockPaper,
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: ListTile(
+                                      onTap: () => enter(p),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
+                                      leading: ProductImage(p, size: 45),
+                                      title: Text(
+                                        p.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        review
+                                            ? context.l10n.expectedAndCounted(
+                                                baseline[id] as int,
+                                                value?.toString() ?? '—',
+                                              )
+                                            : context.l10n.expectedQty(
+                                                baseline[id] as int,
+                                                p.unit,
+                                              ),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.stockMuted,
+                                        ),
+                                      ),
+                                      trailing: review
+                                          ? Tag(
+                                              variance == null
+                                                  ? context.l10n.notCounted
+                                                  : variance == 0
+                                                      ? context.l10n.matches
+                                                      : '${variance > 0 ? '+' : ''}$variance',
+                                              color: variance == 0
+                                                  ? context.stockPositive
+                                                  : context.stockRust,
+                                            )
+                                          : Text(
+                                              value?.toString() ??
+                                                  context.l10n.adjust,
+                                              style: TextStyle(
+                                                color: value == null
+                                                    ? context.stockMuted
+                                                    : context.stockInk,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize:
+                                                    value == null ? 12 : 22,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (baselineKeys.length > 30)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                children: [
+                                  if (_countDisplayLimit <
+                                      baselineKeys.length) ...[
+                                    OutlinedButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _countDisplayLimit += 30;
+                                        });
+                                      },
+                                      icon: const Icon(
+                                        Icons.expand_more,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        'Show more (${baselineKeys.length - _countDisplayLimit} remaining)',
                                       ),
                                     ),
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _countDisplayLimit =
+                                              baselineKeys.length;
+                                        });
+                                      },
+                                      child: Text(
+                                        'Show all (${baselineKeys.length})',
+                                      ),
+                                    ),
+                                  ],
+                                  if (_countDisplayLimit > 30)
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _countDisplayLimit = 30;
+                                        });
+                                      },
+                                      child: const Text('Show less'),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                        ],
+                      );
+                    },
+                  ),
                   const SizedBox(height: 18),
                   FilledButton(
                     onPressed: values.length != baseline.length || store.busy
@@ -1181,29 +1306,29 @@ class _CountPageState extends State<CountPage> {
                             }
                             if (await confirm(
                               context,
-                              'Post reviewed count?',
-                              'Stock will be adjusted to these counted quantities. The reviewed snapshot will be kept in saved records.',
-                              action: 'Post count',
+                              context.l10n.postReviewedCountTitle,
+                              context.l10n.postReviewedCountMessage,
+                              action: context.l10n.postCountAction,
                             )) {
                               await run(store.postCount);
                               if (context.mounted && store.count == null) {
                                 setState(() => review = false);
                                 showMessage(
                                   context,
-                                  'Count posted. Your stock is up to date.',
+                                  context.l10n.countPostedSuccess,
                                 );
                               }
                             }
                           },
                     child: Text(
-                      review ? 'Post reviewed count' : 'Review differences',
+                      review ? context.l10n.postCountAction : context.l10n.reviewDifferences,
                     ),
                   ),
                   if (values.length != baseline.length)
                     Padding(
-                      padding: EdgeInsets.only(top: 10),
+                      padding: const EdgeInsets.only(top: 10),
                       child: Text(
-                        'Count every item, including zeros, before reviewing.',
+                        context.l10n.countEveryItemNotice,
                         style: TextStyle(
                           fontSize: 11,
                           color: context.stockMuted,
@@ -1215,16 +1340,16 @@ class _CountPageState extends State<CountPage> {
                     onPressed: () async {
                       if (await confirm(
                         context,
-                        'Cancel this count?',
-                        'Saved count entries will be discarded. Inventory will stay unchanged.',
-                        action: 'Cancel count',
+                        context.l10n.cancelCountConfirmTitle,
+                        context.l10n.cancelCountConfirmMessage,
+                        action: context.l10n.cancelCountAction,
                       )) {
                         await run(store.cancelCount);
                         if (mounted) setState(() => review = false);
                       }
                     },
                     child: Text(
-                      'Cancel count',
+                      context.l10n.cancelCountAction,
                       style: TextStyle(color: context.stockRust),
                     ),
                   ),

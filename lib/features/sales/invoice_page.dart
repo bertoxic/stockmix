@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:stockmix/core/theme/design.dart';
 import 'package:stockmix/features/app/pages.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 class ReceiptLineItem {
   final Product product;
@@ -199,7 +200,7 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
     try {
       final bytes = await _captureReceiptPng();
       if (bytes == null || bytes.isEmpty) {
-        if (mounted) showMessage(context, 'Unable to capture receipt image.');
+        if (mounted) showMessage(context, context.l10n.unableToCaptureReceipt);
         return;
       }
 
@@ -220,7 +221,7 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
           files: [XFile(tempFile.path, mimeType: 'image/png', name: filename)],
           fileNameOverrides: [filename],
           subject: 'Receipt #${widget.shortRef} from ${widget.store.shop}',
-          title: 'Share receipt',
+          title: context.l10n.shareReceipt,
           sharePositionOrigin: origin,
         ),
       );
@@ -233,11 +234,14 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
 
   Future<void> _downloadReceipt() async {
     if (_isProcessing) return;
+    final dialogTitle = context.l10n.saveReceiptImageToDevice;
+    final unableMsg = context.l10n.unableToCaptureReceipt;
+    final savedMsg = context.l10n.receiptSavedToDevice;
     setState(() => _isProcessing = true);
     try {
       final bytes = await _captureReceiptPng();
       if (bytes == null || bytes.isEmpty) {
-        if (mounted) showMessage(context, 'Unable to capture receipt image.');
+        if (mounted) showMessage(context, unableMsg);
         return;
       }
 
@@ -249,11 +253,11 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
         type: FileType.image,
         allowedExtensions: ['png'],
         mimeType: 'image/png',
-        dialogTitle: 'Save receipt image to device',
+        dialogTitle: dialogTitle,
       );
 
       if (saved != null && mounted) {
-        showMessage(context, 'Receipt saved to device.');
+        showMessage(context, savedMsg);
       }
     } catch (e) {
       if (mounted) showMessage(context, friendlyError(e));
@@ -276,16 +280,16 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Invoice & Receipt'),
+        title: Text(context.l10n.receipt),
         actions: [
           IconButton(
             icon: const Icon(Icons.download_rounded),
-            tooltip: 'Download receipt',
+            tooltip: context.l10n.downloadReceipt,
             onPressed: _isProcessing ? null : _downloadReceipt,
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share receipt',
+            tooltip: context.l10n.shareReceipt,
             onPressed: _isProcessing ? null : _shareReceipt,
           ),
           const SizedBox(width: 8),
@@ -352,7 +356,7 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Sales Receipt & Proof of Purchase',
+                                  context.l10n.salesReceiptProof,
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: context.stockMuted),
@@ -363,7 +367,7 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
                                   children: [
                                     Tag('#$shortRef', color: context.stockInk),
                                     const SizedBox(width: 8),
-                                    Tag('PAID · CASH', color: avocado),
+                                    Tag(context.l10n.paidCash, color: avocado),
                                   ],
                                 ),
                               ],
@@ -384,7 +388,7 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Eyebrow('Date & time'),
+                                    Eyebrow(context.l10n.dateTimeLabel),
                                     const SizedBox(height: 2),
                                     Text(
                                       DateFormat(
@@ -400,10 +404,10 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    const Eyebrow('Items'),
+                                    Eyebrow(context.l10n.items),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '$totalUnits ${totalUnits == 1 ? 'unit' : 'units'}',
+                                      totalUnits == 1 ? context.l10n.oneUnitCount : context.l10n.unitsCount(totalUnits),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 12,
@@ -471,379 +475,379 @@ class _ReceiptInvoicePageState extends State<ReceiptInvoicePage> {
 
                           // Column titles
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: Row(
-                              children: [
-                                Expanded(child: Eyebrow('Item description')),
-                                SizedBox(
-                                  width: 30,
-                                  child: Eyebrow(
-                                    'Qty',
-                                    color: context.stockMuted,
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 58,
-                                  child: Eyebrow(
-                                    'Unit',
-                                    color: context.stockMuted,
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 64,
-                                  child: Text(
-                                    'TOTAL',
-                                    textAlign: TextAlign.end,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.5,
-                                      color: context.stockMuted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Line items list
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: [
-                                for (final item in items) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        ProductImage(item.product, size: 36),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                item.product.name,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              if (item
-                                                  .product
-                                                  .category
-                                                  .isNotEmpty) ...[
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  item.product.category,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: context.stockMuted,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 54,
-                                          child: Text(
-                                            '${item.quantity} ${item.unitName}',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 58,
-                                          child: FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              money(store, item.unitPrice),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: context.stockMuted,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 64,
-                                          child: FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerRight,
-                                            child: Text(
-                                              money(store, item.total),
-                                              textAlign: TextAlign.end,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-
-                          // Dotted separator before total
-                          const SizedBox(height: 16),
-                          Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: Row(
-                              children: List.generate(
-                                30,
-                                (index) => Expanded(
-                                  child: Container(
-                                    height: 1.5,
-                                    color: index.isEven
-                                        ? context.stockLine
-                                        : Colors.transparent,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Total breakdown
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
                               children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      discountAmount > 0 ? 'Subtotal' : 'Total',
-                                      style: TextStyle(
-                                        color: context.stockMuted,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    Text(
-                                      money(
-                                        store,
-                                        totalAmount + discountAmount,
-                                      ),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                if (discountAmount > 0) ...[
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Discount',
-                                        style: TextStyle(
-                                          color: context.stockMuted,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      Text(
-                                        '−${money(store, discountAmount)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                ],
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Payment method',
-                                      style: TextStyle(
-                                        color: context.stockMuted,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Cash',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Total Paid',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                        color: context.stockInk,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerRight,
-                                        child: Text(
-                                          money(store, totalAmount),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 22,
-                                            color: context.stockInk,
-                                            letterSpacing: -0.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
+                                Expanded(child: Eyebrow(context.l10n.itemDescriptionHeader)),
+                                SizedBox(
+                                 width: 30,
+                                 child: Eyebrow(
+                                   context.l10n.qty,
+                                   color: context.stockMuted,
+                                 ),
+                               ),
+                               SizedBox(
+                                 width: 58,
+                                 child: Eyebrow(
+                                   context.l10n.unit,
+                                   color: context.stockMuted,
+                                 ),
+                               ),
+                               SizedBox(
+                                 width: 64,
+                                 child: Text(
+                                   context.l10n.total.toUpperCase(),
+                                   textAlign: TextAlign.end,
+                                   style: TextStyle(
+                                     fontSize: 10,
+                                     fontWeight: FontWeight.w800,
+                                     letterSpacing: 1.5,
+                                     color: context.stockMuted,
+                                   ),
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
+                         const SizedBox(height: 10),
 
-                          // Footer with transaction verification QR
-                          const SizedBox(height: 24),
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: context.stockLinen,
-                              borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(24),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: paper,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: context.stockLine,
-                                    ),
-                                  ),
-                                  child: QrImageView(
-                                    data: 'SMX:REC:$reference',
-                                    size: 68,
-                                    padding: EdgeInsets.zero,
-                                    version: QrVersions.auto,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Thank you for your visit!',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                          color: context.stockInk,
-                                        ),
-                                      ),
-                                      SizedBox(height: 3),
-                                      Text(
-                                        'Retain this receipt for returns or exchanges within standard store policy.',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: context.stockMuted,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                         // Line items list
+                         Padding(
+                           padding: const EdgeInsets.symmetric(horizontal: 20),
+                           child: Column(
+                             children: [
+                               for (final item in items) ...[
+                                 Padding(
+                                   padding: const EdgeInsets.symmetric(
+                                     vertical: 8,
+                                   ),
+                                   child: Row(
+                                     crossAxisAlignment:
+                                         CrossAxisAlignment.center,
+                                     children: [
+                                       ProductImage(item.product, size: 36),
+                                       const SizedBox(width: 10),
+                                       Expanded(
+                                         child: Column(
+                                           crossAxisAlignment:
+                                               CrossAxisAlignment.start,
+                                           children: [
+                                             Text(
+                                               item.product.name,
+                                               style: const TextStyle(
+                                                 fontWeight: FontWeight.w700,
+                                                 fontSize: 13,
+                                               ),
+                                               maxLines: 2,
+                                               overflow: TextOverflow.ellipsis,
+                                             ),
+                                             if (item
+                                                 .product
+                                                 .category
+                                                 .isNotEmpty) ...[
+                                               const SizedBox(height: 2),
+                                               Text(
+                                                 item.product.category,
+                                                 style: TextStyle(
+                                                   fontSize: 11,
+                                                   color: context.stockMuted,
+                                                 ),
+                                               ),
+                                             ],
+                                           ],
+                                         ),
+                                       ),
+                                       SizedBox(
+                                         width: 54,
+                                         child: Text(
+                                           '${item.quantity} ${item.unitName}',
+                                           overflow: TextOverflow.ellipsis,
+                                           style: const TextStyle(
+                                             fontWeight: FontWeight.w600,
+                                             fontSize: 13,
+                                           ),
+                                         ),
+                                       ),
+                                       SizedBox(
+                                         width: 58,
+                                         child: FittedBox(
+                                           fit: BoxFit.scaleDown,
+                                           alignment: Alignment.centerLeft,
+                                           child: Text(
+                                             money(store, item.unitPrice),
+                                             style: TextStyle(
+                                               fontSize: 12,
+                                               color: context.stockMuted,
+                                             ),
+                                           ),
+                                         ),
+                                       ),
+                                       SizedBox(
+                                         width: 64,
+                                         child: FittedBox(
+                                           fit: BoxFit.scaleDown,
+                                           alignment: Alignment.centerRight,
+                                           child: Text(
+                                             money(store, item.total),
+                                             textAlign: TextAlign.end,
+                                             style: const TextStyle(
+                                               fontWeight: FontWeight.w700,
+                                               fontSize: 13,
+                                             ),
+                                           ),
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ],
+                             ],
+                           ),
+                         ),
 
-                  const SizedBox(height: 24),
+                         // Dotted separator before total
+                         const SizedBox(height: 16),
+                         Padding(
+                           padding: const EdgeInsets.symmetric(horizontal: 20),
+                           child: Row(
+                             children: List.generate(
+                               30,
+                               (index) => Expanded(
+                                 child: Container(
+                                   height: 1.5,
+                                   color: index.isEven
+                                       ? context.stockLine
+                                       : Colors.transparent,
+                                 ),
+                               ),
+                             ),
+                           ),
+                         ),
+                         const SizedBox(height: 16),
 
-                  // Primary action buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: plum,
-                            foregroundColor: paper,
-                            minimumSize: const Size(0, 52),
-                          ),
-                          onPressed: _isProcessing ? null : _shareReceipt,
-                          icon: _isProcessing
-                              ? SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: context.stockPaper,
-                                  ),
-                                )
-                              : const Icon(Icons.share, size: 18),
-                          label: const Text('Share receipt'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(0, 52),
-                            foregroundColor: context.stockInk,
-                            side: BorderSide(color: context.stockLine),
-                          ),
-                          onPressed: _isProcessing ? null : _downloadReceipt,
-                          icon: const Icon(Icons.download_rounded, size: 18),
-                          label: const Text('Download receipt'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Back to store'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+                         // Total breakdown
+                         Padding(
+                           padding: const EdgeInsets.symmetric(horizontal: 20),
+                           child: Column(
+                             children: [
+                               Row(
+                                 mainAxisAlignment:
+                                     MainAxisAlignment.spaceBetween,
+                                 children: [
+                                   Text(
+                                     discountAmount > 0 ? context.l10n.subtotal : context.l10n.total,
+                                     style: TextStyle(
+                                       color: context.stockMuted,
+                                       fontSize: 13,
+                                     ),
+                                   ),
+                                   Text(
+                                     money(
+                                       store,
+                                       totalAmount + discountAmount,
+                                     ),
+                                     style: const TextStyle(
+                                       fontWeight: FontWeight.w600,
+                                       fontSize: 13,
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                               const SizedBox(height: 6),
+                               if (discountAmount > 0) ...[
+                                 Row(
+                                   mainAxisAlignment:
+                                       MainAxisAlignment.spaceBetween,
+                                   children: [
+                                     Text(
+                                       context.l10n.discount,
+                                       style: TextStyle(
+                                         color: context.stockMuted,
+                                         fontSize: 13,
+                                       ),
+                                     ),
+                                     Text(
+                                       '−${money(store, discountAmount)}',
+                                       style: const TextStyle(
+                                         fontWeight: FontWeight.w600,
+                                         fontSize: 13,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                                 const SizedBox(height: 6),
+                               ],
+                               Row(
+                                 mainAxisAlignment:
+                                     MainAxisAlignment.spaceBetween,
+                                 children: [
+                                   Text(
+                                     context.l10n.paymentMethod,
+                                     style: TextStyle(
+                                       color: context.stockMuted,
+                                       fontSize: 13,
+                                     ),
+                                   ),
+                                   Text(
+                                     context.l10n.cash,
+                                     style: const TextStyle(
+                                       fontWeight: FontWeight.w600,
+                                       fontSize: 13,
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                               const SizedBox(height: 14),
+                               Row(
+                                 mainAxisAlignment:
+                                     MainAxisAlignment.spaceBetween,
+                                 children: [
+                                   Text(
+                                     context.l10n.totalPaid,
+                                     style: TextStyle(
+                                       fontWeight: FontWeight.w800,
+                                       fontSize: 16,
+                                       color: context.stockInk,
+                                     ),
+                                   ),
+                                   const SizedBox(width: 8),
+                                   Flexible(
+                                     child: FittedBox(
+                                       fit: BoxFit.scaleDown,
+                                       alignment: Alignment.centerRight,
+                                       child: Text(
+                                         money(store, totalAmount),
+                                         style: TextStyle(
+                                           fontWeight: FontWeight.w800,
+                                           fontSize: 22,
+                                           color: context.stockInk,
+                                           letterSpacing: -0.5,
+                                         ),
+                                       ),
+                                     ),
+                                   ),
+                                 ],
+                               ),
+                             ],
+                           ),
+                         ),
+
+                         // Footer with transaction verification QR
+                         const SizedBox(height: 24),
+                         Container(
+                           padding: const EdgeInsets.all(20),
+                           decoration: BoxDecoration(
+                             color: context.stockLinen,
+                             borderRadius: const BorderRadius.vertical(
+                               bottom: Radius.circular(24),
+                             ),
+                           ),
+                           child: Row(
+                             children: [
+                               Container(
+                                 padding: const EdgeInsets.all(6),
+                                 decoration: BoxDecoration(
+                                   color: paper,
+                                   borderRadius: BorderRadius.circular(12),
+                                   border: Border.all(
+                                     color: context.stockLine,
+                                   ),
+                                 ),
+                                 child: QrImageView(
+                                   data: 'SMX:REC:$reference',
+                                   size: 68,
+                                   padding: EdgeInsets.zero,
+                                   version: QrVersions.auto,
+                                 ),
+                               ),
+                               const SizedBox(width: 16),
+                               Expanded(
+                                 child: Column(
+                                   crossAxisAlignment:
+                                       CrossAxisAlignment.start,
+                                   children: [
+                                     Text(
+                                       context.l10n.thankYouVisit,
+                                       style: TextStyle(
+                                         fontWeight: FontWeight.w700,
+                                         fontSize: 13,
+                                         color: context.stockInk,
+                                       ),
+                                     ),
+                                     const SizedBox(height: 3),
+                                     Text(
+                                       context.l10n.retainReceiptNotice,
+                                       style: TextStyle(
+                                         fontSize: 11,
+                                         color: context.stockMuted,
+                                         height: 1.4,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                 ),
+
+                 const SizedBox(height: 24),
+
+                 // Primary action buttons
+                 Row(
+                   children: [
+                     Expanded(
+                       child: FilledButton.icon(
+                         style: FilledButton.styleFrom(
+                           backgroundColor: plum,
+                           foregroundColor: paper,
+                           minimumSize: const Size(0, 52),
+                         ),
+                         onPressed: _isProcessing ? null : _shareReceipt,
+                         icon: _isProcessing
+                             ? SizedBox(
+                                 width: 18,
+                                 height: 18,
+                                 child: CircularProgressIndicator(
+                                   strokeWidth: 2,
+                                   color: context.stockPaper,
+                                 ),
+                               )
+                             : const Icon(Icons.share, size: 18),
+                         label: Text(context.l10n.shareReceipt),
+                       ),
+                     ),
+                     const SizedBox(width: 12),
+                     Expanded(
+                       child: OutlinedButton.icon(
+                         style: OutlinedButton.styleFrom(
+                           minimumSize: const Size(0, 52),
+                           foregroundColor: context.stockInk,
+                           side: BorderSide(color: context.stockLine),
+                         ),
+                         onPressed: _isProcessing ? null : _downloadReceipt,
+                         icon: const Icon(Icons.download_rounded, size: 18),
+                         label: Text(context.l10n.downloadReceipt),
+                       ),
+                     ),
+                   ],
+                 ),
+                 const SizedBox(height: 12),
+                 Center(
+                   child: TextButton(
+                     onPressed: () => Navigator.pop(context),
+                     child: Text(context.l10n.backToStore),
+                   ),
+                 ),
+               ],
+             ),
+           ),
+         ),
+       ),
+     ),
+   );
+ }
 }

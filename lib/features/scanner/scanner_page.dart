@@ -777,291 +777,317 @@ class _ScannerPageState extends State<ScannerPage> {
 
               // Live list of scanned item widgets placed directly under the camera
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    // Unrecognized barcode banner if detected
-                    if (unrecognizedCode != null) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: rust.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: rust.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              color: context.stockRust,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Unregistered barcode',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: context.stockRust,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    unrecognizedCode!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: context.stockMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton.icon(
-                              style: TextButton.styleFrom(
-                                foregroundColor: context.stockRust,
-                              ),
-                              onPressed: () =>
-                                  _quickAddProduct(unrecognizedCode!),
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text(
-                                'Add item',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                size: 16,
-                                color: context.stockMuted,
-                              ),
-                              onPressed: () =>
-                                  setState(() => unrecognizedCode = null),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Header for scanned items
-                    Row(
-                      children: [
-                        Eyebrow('Scanned items (${cart.length})'),
-                        const Spacer(),
-                        if (cart.isNotEmpty)
-                          Text(
-                            '$totalUnits units',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: context.stockMuted,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Scanned item widgets
-                    if (cart.isEmpty)
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 16),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 24,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: context.stockPaper,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: context.stockLine),
-                        ),
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      sliver: SliverToBoxAdapter(
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.qr_code_scanner,
-                              size: 36,
-                              color: cement,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Ready to scan',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Scan item barcodes continuously. Each scanned item will appear here with its price and count.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: context.stockMuted,
-                                fontSize: 11,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ...cart.lines.map((line) {
-                        final p = store.product(line.productId);
-                        final qty = line.quantity;
-                        final lineTotal = line.total;
-                        final maxStock = store.stock(p);
-                        final baseQuantity = cart.baseQuantityFor(p.id);
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Surface(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                InkWell(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ProductPage(store: store, id: p.id),
-                                    ),
-                                  ),
-                                  child: ProductImage(p, size: 44),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        p.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${money(store, line.unitPrice)} / ${line.unitName}  ·  ${store.stockLabel(p)} in stock',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: context.stockMuted,
-                                        ),
-                                      ),
-                                    ],
+                            // Unrecognized barcode banner if detected
+                            if (unrecognizedCode != null) ...[
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: rust.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: rust.withValues(alpha: 0.3),
                                   ),
                                 ),
-                                // Quantity controls
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                child: Row(
                                   children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: context.stockRust,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Unregistered barcode',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: context.stockRust,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          Text(
+                                            unrecognizedCode!,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: context.stockMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: context.stockRust,
+                                      ),
+                                      onPressed: () =>
+                                          _quickAddProduct(unrecognizedCode!),
+                                      icon: const Icon(Icons.add, size: 16),
+                                      label: const Text(
+                                        'Add item',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
                                     IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: 'Remove one',
                                       icon: Icon(
-                                        qty == 1
-                                            ? Icons.delete_outline
-                                            : Icons.remove_circle_outline,
-                                        size: 20,
-                                        color: qty == 1
-                                            ? context.stockRust
-                                            : context.stockInk,
+                                        Icons.close,
+                                        size: 16,
+                                        color: context.stockMuted,
                                       ),
-                                      onPressed: () => _decrement(line),
-                                    ),
-                                    Container(
-                                      constraints: const BoxConstraints(
-                                        minWidth: 24,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        '$qty ${line.unitName}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: 'Add one',
-                                      icon: const Icon(
-                                        Icons.add_circle_outline,
-                                        size: 20,
-                                      ),
-                                      onPressed:
-                                          baseQuantity + line.unitMultiplier >
-                                              maxStock
-                                          ? null
-                                          : () => _increment(line),
+                                      onPressed: () =>
+                                          setState(() => unrecognizedCode = null),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(width: 4),
-                                // Line total
-                                SizedBox(
-                                  width: 62,
-                                  child: Text(
-                                    money(store, lineTotal),
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
+                              ),
+                            ],
+
+                            // Header for scanned items
+                            Row(
+                              children: [
+                                Eyebrow('Scanned items (${cart.length})'),
+                                const Spacer(),
+                                if (cart.isNotEmpty)
+                                  Text(
+                                    '$totalUnits units',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: context.stockMuted,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                              ],
+                            ),
+                            if (cart.isEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                margin: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 24,
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.stockPaper,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: context.stockLine),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.qr_code_scanner,
+                                      size: 36,
+                                      color: cement,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      'Ready to scan',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Scan item barcodes continuously. Each scanned item will appear here with its price and count.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: context.stockMuted,
+                                        fontSize: 11,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (cart.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverList.builder(
+                          itemCount: cart.lines.length,
+                          itemBuilder: (context, index) {
+                            final line = cart.lines[index];
+                            final p = store.product(line.productId);
+                            final qty = line.quantity;
+                            final lineTotal = line.total;
+                            final maxStock = store.stock(p);
+                            final baseQuantity = cart.baseQuantityFor(p.id);
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Surface(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              ProductPage(store: store, id: p.id),
+                                        ),
+                                      ),
+                                      child: ProductImage(p, size: 44),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            p.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${money(store, line.unitPrice)} / ${line.unitName}  ·  ${store.stockLabel(p)} in stock',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: context.stockMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Quantity controls
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          tooltip: 'Remove one',
+                                          icon: Icon(
+                                            qty == 1
+                                                ? Icons.delete_outline
+                                                : Icons.remove_circle_outline,
+                                            size: 20,
+                                            color: qty == 1
+                                                ? context.stockRust
+                                                : context.stockInk,
+                                          ),
+                                          onPressed: () => _decrement(line),
+                                        ),
+                                        Container(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 24,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            '$qty ${line.unitName}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          tooltip: 'Add one',
+                                          icon: const Icon(
+                                            Icons.add_circle_outline,
+                                            size: 20,
+                                          ),
+                                          onPressed:
+                                              baseQuantity + line.unitMultiplier >
+                                                      maxStock
+                                                  ? null
+                                                  : () => _increment(line),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    // Line total
+                                    SizedBox(
+                                      width: 62,
+                                      child: Text(
+                                        money(store, lineTotal),
+                                        textAlign: TextAlign.end,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 4),
+                            // Manual code entry row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: manual,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Or type barcode…',
+                                      prefixIcon: Icon(Icons.qr_code, size: 20),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    onSubmitted: (v) {
+                                      detected(v);
+                                      manual.clear();
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(0, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    detected(manual.text);
+                                    manual.clear();
+                                  },
+                                  child: const Text('Add'),
                                 ),
                               ],
                             ),
-                          ),
-                        );
-                      }),
-
-                    const SizedBox(height: 12),
-                    // Manual code entry row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: manual,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              hintText: 'Or type barcode…',
-                              prefixIcon: Icon(Icons.qr_code, size: 20),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                            ),
-                            onSubmitted: (v) {
-                              detected(v);
-                              manual.clear();
-                            },
-                          ),
+                            const SizedBox(height: 14),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          onPressed: () {
-                            detected(manual.text);
-                            manual.clear();
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 14),
                   ],
                 ),
               ),

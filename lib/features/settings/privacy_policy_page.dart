@@ -52,7 +52,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Zero Data Collection',
+                              'Private Business Records',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -60,7 +60,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                                   ),
                             ),
                             Text(
-                              '100% Offline & Private by Design',
+                              'On-Device Storage · Transparent Advertising',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.stockMuted,
@@ -73,7 +73,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'Stockmix operates entirely on your device. We do not operate cloud servers, create user accounts, deploy trackers, or sell your data. Your business records remain exclusively yours.',
+                    'Stockmix keeps your inventory, prices, sales, and photos strictly on your physical device. We operate no cloud databases and do not collect your business records. To keep the app free, Stockmix displays privacy-compliant advertisements via Google AdMob.',
                     style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                 ],
@@ -95,10 +95,10 @@ class PrivacyPolicyPage extends StatelessWidget {
 
             _buildSection(
               context,
-              icon: Icons.track_changes_outlined,
-              title: 'Zero Tracking & No Ads',
+              icon: Icons.campaign_outlined,
+              title: 'Advertising (Google AdMob)',
               content:
-                  'We do not collect analytics, crash logs, or telemetry (no Firebase, Mixpanel, or Sentry). We never access Apple IDFA or Google Advertising IDs.',
+                  'Stockmix is supported by native advertising from Google Mobile Ads (AdMob). The AdMob SDK may process pseudonymous device identifiers (such as Google Advertising ID), approximate IP location, and ad interaction telemetry for fraud detection, frequency capping, and ad delivery. Your store and inventory records are NEVER linked or sent to AdMob.',
             ),
 
             _buildSection(
@@ -143,18 +143,18 @@ class PrivacyPolicyPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildBullet(
-                    'Apple App Store Review Guidelines (5.1.1 & 5.1.2):',
-                    'Meets all criteria for "Data Not Collected".',
+                    'Apple App Store Privacy Labels:',
+                    'Business records: "Data Not Collected". Advertising: Device ID and diagnostics used for third-party advertising via Google AdMob.',
                   ),
                   const SizedBox(height: 8),
                   _buildBullet(
                     'Google Play Data Safety Policy:',
-                    'Zero data collection or third-party sharing declared.',
+                    'Contains Ads declared. Device/other IDs and ad interaction diagnostics declared for advertising and fraud prevention via Google Play Services.',
                   ),
                   const SizedBox(height: 8),
                   _buildBullet(
                     'GDPR & CCPA Compliant:',
-                    'Full rights to access, rectification, portability, and erasure.',
+                    'Full rights to access, rectification, portability, and erasure. Ad choices and consent handled per Google AdMob standards.',
                   ),
                 ],
               ),

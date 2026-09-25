@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:stockmix/core/services/scan_feedback.dart';
 import 'package:stockmix/core/theme/design.dart';
 import 'package:stockmix/features/app/pages.dart';
+import 'package:stockmix/features/settings/backup_page.dart';
 import 'package:stockmix/features/settings/privacy_policy_page.dart';
 import 'package:stockmix/features/stock/stock_store.dart';
+import 'package:stockmix/l10n/app_localizations.dart';
 
 class StoreSettingsPage extends StatefulWidget {
   final StockStore store;
@@ -17,6 +19,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   late TextEditingController _nameController;
   late TextEditingController _userNameController;
   late String _currency;
+  late String _language;
   late bool _sound;
   late bool _haptics;
   late String _theme;
@@ -56,6 +59,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     _nameController = TextEditingController(text: store.shop);
     _userNameController = TextEditingController(text: store.userName);
     _currency = _currencies.contains(store.currency) ? store.currency : 'USD';
+    _language = store.languageCode ?? 'system';
     _sound = store.soundEnabled;
     _haptics = store.hapticsEnabled;
     _theme = store.themeMode;
@@ -94,12 +98,13 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
         showExpiryField: _showExpiryField,
         showLabels: _showLabels,
         labels: _labelControllers.map((controller) => controller.text),
+        languageCode: _language,
       );
       ScanFeedback.soundEnabled = _sound;
       ScanFeedback.hapticsEnabled = _haptics;
 
       if (mounted) {
-        showMessage(context, 'Store settings updated.');
+        showMessage(context, context.l10n.storeSettingsUpdated);
         Navigator.pop(context);
       }
     } catch (e) {
@@ -132,15 +137,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 22),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 22),
                 child: Row(
                   children: [
-                    Icon(Icons.payments_outlined),
-                    SizedBox(width: 10),
+                    const Icon(Icons.payments_outlined),
+                    const SizedBox(width: 10),
                     Text(
-                      'Display currency',
-                      style: TextStyle(
+                      sheetContext.l10n.displayCurrency,
+                      style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
@@ -152,7 +157,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 22),
                 child: Text(
-                  'Choose the currency shown across your store.',
+                  sheetContext.l10n.chooseCurrencyDescription,
                   style: TextStyle(
                     fontSize: 12,
                     color: sheetContext.stockMuted,
@@ -212,11 +217,171 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     if (selected != null && mounted) setState(() => _currency = selected);
   }
 
+  String get _currentLanguageLabel {
+    if (_language == 'system') return 'Match System';
+    final match = AppLocalizations.supportedLanguages.where((l) => l.code == _language);
+    if (match.isNotEmpty) return match.first.englishName;
+    return _language;
+  }
+
+  String get _currentLanguageNative {
+    if (_language == 'system') return 'System default';
+    final match = AppLocalizations.supportedLanguages.where((l) => l.code == _language);
+    if (match.isNotEmpty) return match.first.name;
+    return _language;
+  }
+
+  Future<void> _pickLanguage() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          height: MediaQuery.sizeOf(sheetContext).height * .75,
+          decoration: BoxDecoration(
+            color: sheetContext.stockPaper,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: sheetContext.stockLine,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Row(
+                  children: [
+                    Text(
+                      sheetContext.l10n.selectLanguage,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: sheetContext.l10n.close,
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 22),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    sheetContext.l10n.chooseLanguageDescription,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: sheetContext.stockMuted,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  children: [
+                    _languageItem(
+                      sheetContext,
+                      code: 'system',
+                      nativeName: sheetContext.l10n.systemDefault,
+                      englishName: sheetContext.l10n.matchSystemTheme,
+                      isSelected: _language == 'system',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final lang in AppLocalizations.supportedLanguages) ...[
+                      _languageItem(
+                        sheetContext,
+                        code: lang.code,
+                        nativeName: lang.name,
+                        englishName: lang.englishName,
+                        isSelected: _language == lang.code,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() => _language = selected);
+    }
+  }
+
+  Widget _languageItem(
+    BuildContext sheetContext, {
+    required String code,
+    required String nativeName,
+    required String englishName,
+    required bool isSelected,
+  }) {
+    return Material(
+      color: isSelected ? avocado : sheetContext.stockLinen,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.pop(sheetContext, code),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nativeName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: isSelected ? plum : sheetContext.stockInk,
+                      ),
+                    ),
+                    Text(
+                      englishName,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? plum.withAlpha(200) : sheetContext.stockMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: plum,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Store & App Settings'),
+        title: Text(context.l10n.storeAppSettings),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -226,9 +391,9 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text(
-                    'Save',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                : Text(
+                    context.l10n.save,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
           ),
           const SizedBox(width: 8),
@@ -242,7 +407,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
                 // Store Identity Card
-                const Eyebrow('Store Identity'),
+                Eyebrow(context.l10n.storeIdentity),
                 const SizedBox(height: 10),
                 Surface(
                   child: Column(
@@ -251,10 +416,10 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                       TextField(
                         controller: _nameController,
                         maxLength: 60,
-                        decoration: const InputDecoration(
-                          labelText: 'Store name',
-                          hintText: 'e.g. Corner Grocery',
-                          prefixIcon: Icon(Icons.storefront_outlined),
+                        decoration: InputDecoration(
+                          labelText: context.l10n.storeName,
+                          hintText: context.l10n.storeNameHint,
+                          prefixIcon: const Icon(Icons.storefront_outlined),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -262,24 +427,36 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         controller: _userNameController,
                         maxLength: 60,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          labelText: 'Your name',
-                          hintText: 'e.g. Maya Okafor',
-                          prefixIcon: Icon(Icons.person_outline),
+                        decoration: InputDecoration(
+                          labelText: context.l10n.yourName,
+                          hintText: context.l10n.yourNameHint,
+                          prefixIcon: const Icon(Icons.person_outline),
                         ),
                       ),
                       Text(
-                        'Shown as the sender on files and QR streams you share. If left blank, your store name is used.',
+                        context.l10n.yourNameCaption,
                         style: TextStyle(
                           fontSize: 11,
                           color: context.stockMuted,
                           height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Currency & Display Card
+                Eyebrow(context.l10n.currencyAndDisplay),
+                const SizedBox(height: 10),
+                Surface(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Semantics(
                         button: true,
-                        label: 'Display currency',
+                        label: context.l10n.displayCurrency,
                         child: Material(
                           color: context.stockLinen,
                           borderRadius: BorderRadius.circular(16),
@@ -305,19 +482,19 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  const Expanded(
+                                  Expanded(
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Display currency',
-                                          style: TextStyle(
+                                          context.l10n.displayCurrency,
+                                          style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        SizedBox(height: 3),
+                                        const SizedBox(height: 3),
                                       ],
                                     ),
                                   ),
@@ -338,7 +515,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Changing currency updates the symbol across items, receipts, and reports. No exchange rate conversion is applied.',
+                        context.l10n.displayCurrencyCaption,
                         style: TextStyle(
                           fontSize: 11,
                           color: context.stockMuted,
@@ -351,7 +528,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
 
                 const SizedBox(height: 24),
 
-                const Eyebrow('Add Item Fields'),
+                Eyebrow(context.l10n.addItemFields),
                 const SizedBox(height: 10),
                 Surface(
                   child: Column(
@@ -359,15 +536,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         secondary: const Icon(Icons.event_outlined),
-                        title: const Text(
-                          'Expiry date',
-                          style: TextStyle(
+                        title: Text(
+                          context.l10n.expiryDate,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
-                          'Show an expiry-date entry when adding or editing an item',
+                          context.l10n.expiryDateSubtitle,
                           style: TextStyle(
                             fontSize: 11,
                             color: context.stockMuted,
@@ -383,15 +560,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         secondary: const Icon(Icons.sell_outlined),
-                        title: const Text(
-                          'Label',
-                          style: TextStyle(
+                        title: Text(
+                          context.l10n.customItemLabels,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
-                          'Show up to three label buttons when adding an item',
+                          context.l10n.customLabelsSubtitle,
                           style: TextStyle(
                             fontSize: 11,
                             color: context.stockMuted,
@@ -407,7 +584,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Text(
-                            'Set up to three labels. They become transparent buttons on the Add Item page.',
+                            context.l10n.customLabelsCaption,
                             style: TextStyle(
                               fontSize: 11,
                               color: context.stockMuted,
@@ -426,7 +603,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                             maxLength: 30,
                             textCapitalization: TextCapitalization.words,
                             decoration: InputDecoration(
-                              labelText: 'Label ${index + 1}',
+                              labelText: '${context.l10n.labelTag} ${index + 1}',
                               hintText: 'e.g. Fragile',
                             ),
                           ),
@@ -441,7 +618,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 const SizedBox(height: 24),
 
                 // Sound & Haptic Feedback
-                const Eyebrow('Scan Feedback'),
+                Eyebrow(context.l10n.scanFeedbackSounds),
                 const SizedBox(height: 10),
                 Surface(
                   child: Column(
@@ -460,15 +637,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                             size: 20,
                           ),
                         ),
-                        title: const Text(
-                          'Scan audio tone',
-                          style: TextStyle(
+                        title: Text(
+                          context.l10n.scanAudioTone,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
-                          'Plays a crisp tone on accepted barcode scans',
+                          context.l10n.scanAudioToneSubtitle,
                           style: TextStyle(
                             fontSize: 11,
                             color: context.stockMuted,
@@ -492,15 +669,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                             size: 20,
                           ),
                         ),
-                        title: const Text(
-                          'Haptic vibration',
-                          style: TextStyle(
+                        title: Text(
+                          context.l10n.hapticVibration,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
-                          'Vibrates device upon successful barcode scan',
+                          context.l10n.hapticVibrationSubtitle,
                           style: TextStyle(
                             fontSize: 11,
                             color: context.stockMuted,
@@ -516,7 +693,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 const SizedBox(height: 24),
 
                 // Theme & Appearance
-                const Eyebrow('Theme & Appearance'),
+                Eyebrow(context.l10n.themeAppearance),
                 const SizedBox(height: 10),
                 Surface(
                   child: RadioGroup<String>(
@@ -530,14 +707,14 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         RadioListTile<String>(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
-                            'Light Theme (Default)',
-                            style: TextStyle(
+                            context.l10n.lightThemeDefault,
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                           subtitle: Text(
-                            'Artisanal linen, avocado, and plum palette',
+                            context.l10n.lightThemeDescription,
                             style: TextStyle(
                               fontSize: 11,
                               color: context.stockMuted,
@@ -548,14 +725,14 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         RadioListTile<String>(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
-                            'Match System Theme',
-                            style: TextStyle(
+                            context.l10n.matchSystemTheme,
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                           subtitle: Text(
-                            'Adapts automatically to device dark / light mode',
+                            context.l10n.matchSystemThemeDescription,
                             style: TextStyle(
                               fontSize: 11,
                               color: context.stockMuted,
@@ -566,14 +743,14 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         RadioListTile<String>(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
-                            'Dark Theme',
-                            style: TextStyle(
+                            context.l10n.darkTheme,
+                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                           subtitle: Text(
-                            'Warm plum surfaces with linen and avocado accents',
+                            context.l10n.darkThemeDescription,
                             style: TextStyle(
                               fontSize: 11,
                               color: context.stockMuted,
@@ -588,19 +765,115 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
 
                 const SizedBox(height: 24),
 
+                Eyebrow(context.l10n.languageAndRegion),
+                const SizedBox(height: 10),
+                Surface(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        button: true,
+                        label: context.l10n.displayLanguage,
+                        child: Material(
+                          color: context.stockLinen,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _pickLanguage,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: avocado.withValues(alpha: .55),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.language_rounded,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          context.l10n.language,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          _currentLanguageLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: context.stockMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      _currentLanguageNative,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.keyboard_arrow_down_rounded),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        context.l10n.languageCaption,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.stockMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                Eyebrow(context.l10n.storeOverviewMetrics),
+                const SizedBox(height: 10),
                 Surface(
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     secondary: const Icon(Icons.bar_chart_rounded),
-                    title: const Text(
-                      'Show store statistics',
-                      style: TextStyle(
+                    title: Text(
+                      context.l10n.showStoreStats,
+                      style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
                     ),
                     subtitle: Text(
-                      'Display product counts, movements, and stock value',
+                      context.l10n.showStoreStatsSubtitle,
                       style: TextStyle(fontSize: 11, color: context.stockMuted),
                     ),
                     value: _showStatistics,
@@ -611,23 +884,65 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 ),
                 if (_showStatistics) ...[
                   const SizedBox(height: 24),
-                  const Eyebrow('Store Statistics'),
+                  Eyebrow(context.l10n.storeStatistics),
                   const SizedBox(height: 10),
                   Surface(
                     child: Wrap(
                       spacing: 28,
                       runSpacing: 20,
                       children: [
-                        _statistic('Products', '${store.products.length}'),
-                        _statistic('Movements', '${store.movements.length}'),
+                        _statistic(context.l10n.productsLabel, '${store.products.length}'),
+                        _statistic(context.l10n.movementsLabel, '${store.movements.length}'),
                         _statistic(
-                          'Stock Value',
+                          context.l10n.stockValueLabel,
                           money(store, store.valuation),
                         ),
                       ],
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 24),
+
+                Eyebrow(context.l10n.dataManagement),
+                const SizedBox(height: 10),
+                Surface(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: avocado.withValues(alpha: .55),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.settings_backup_restore_outlined,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      context.l10n.fullBackupRestore,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      context.l10n.backupRestoreCaption,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.stockMuted,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BackupRestorePage(store: store),
+                      ),
+                    ),
+                  ),
+                ),
 
                 const SizedBox(height: 32),
 
@@ -636,14 +951,14 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: _saving ? null : _save,
-                  child: const Text('Save Settings'),
+                  child: Text(context.l10n.saveSettings),
                 ),
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton.icon(
                     onPressed: () => showPrivacyPolicyDialog(context),
                     icon: const Icon(Icons.privacy_tip_outlined, size: 18),
-                    label: const Text('Privacy & Data Policy'),
+                    label: Text(context.l10n.privacyAndDataPolicy),
                   ),
                 ),
               ],
